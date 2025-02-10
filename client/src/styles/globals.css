@@ -1,0 +1,12 @@
+@tailwind base;
+
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar-thumb {
+  @apply bg-slate-500;
+  border-radius: 2px;
+}
+
+@tailwind components;
+@tailwind utilities;
