@@ -408,7 +408,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   }
 
   function copyInvite() {
-    const text = `https://chessthan.verel.app/${lobby.endReason ? `archive/${lobby.id}` : initialLobby.code}`;
+    const text = `https://chessthan.vercel.app/${lobby.endReason ? `archive/${lobby.id}` : initialLobby.code}`;
     if ("clipboard" in navigator) {
       navigator.clipboard.writeText(text);
     } else {
