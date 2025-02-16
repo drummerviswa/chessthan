@@ -1,4 +1,4 @@
-import type { User } from "@chessu/types";
+import type { User } from "../types_config/index.d.ts";
 import { hash, verify } from "argon2";
 import type { Request, Response } from "express";
 import xss from "xss";

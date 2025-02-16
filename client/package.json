@@ -19,7 +19,7 @@
         "socket.io-client": "^4.7.5"
     },
     "devDependencies": {
-        "@chessu/types": "workspace:*",
+        "@chessu/types": "@types_config/index",
         "@types/node": "^20.14.10",
         "@types/react": "^18.3.3",
         "@types/react-dom": "^18.3.0",

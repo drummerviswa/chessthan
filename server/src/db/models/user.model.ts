@@ -1,4 +1,4 @@
-import type { User } from "@chessu/types";
+import type { User } from "../../types_config/index.d.ts";
 import { db } from "../index.js";
 
 export const create = async (user: User, password: string) => {

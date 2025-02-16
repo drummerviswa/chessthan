@@ -1,6 +1,6 @@
 import ArchivedGame from "@/components/archive/ArchivedGame";
 import { fetchArchivedGame } from "@/lib/game";
-import type { Game } from "@chessu/types";
+import type { Game } from "@/types_config/index";
 import { notFound } from "next/navigation";
 
 export async function generateMetadata({ params }: { params: { id: number } }) {

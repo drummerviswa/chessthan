@@ -25,7 +25,7 @@ export default function JoinGame() {
 
     setButtonLoading(true);
 
-    if (code.startsWith("ches.su")) {
+    if (code.startsWith("chessthan")) {
       code = "http://" + code;
     }
     if (code.startsWith("http")) {

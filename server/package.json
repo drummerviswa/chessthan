@@ -23,7 +23,7 @@
         "xss": "^1.0.15"
     },
     "devDependencies": {
-        "@chessu/types": "workspace:*",
+        "@/types_config/index": "@/types_config/index",
         "@types/connect-pg-simple": "^7.0.3",
         "@types/cors": "^2.8.17",
         "@types/express": "^4.17.21",

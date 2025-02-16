@@ -1,6 +1,6 @@
 "use client";
 
-import type { User } from "@chessu/types";
+import type { User } from "@/types_config/index";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 

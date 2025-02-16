@@ -15,7 +15,7 @@ import { SessionContext } from "@/context/session";
 import { useContext, useEffect, useReducer, useRef, useState } from "react";
 
 import type { Message } from "@/types";
-import type { Game } from "@chessu/types";
+import type { Game } from "@/types_config/index";
 
 import type { Move, Square } from "chess.js";
 import { Chess } from "chess.js";
@@ -667,7 +667,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    ches.su/archive/{lobby.id}
+                    chessthan/archive/{lobby.id}
                   </a>
                   .
                 </div>

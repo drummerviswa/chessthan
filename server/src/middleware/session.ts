@@ -1,4 +1,4 @@
-import type { User } from "@chessu/types";
+import type { User } from "../types_config/index.d.ts";
 import PGSimple from "connect-pg-simple";
 import type { Session } from "express-session";
 import session from "express-session";
