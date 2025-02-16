@@ -1,4 +1,4 @@
-import type { Game } from "@chessu/types";
+import type { Game } from "../types_config/index.d.ts";
 import { Chess } from "chess.js";
 import type { DisconnectReason, Socket } from "socket.io";
 

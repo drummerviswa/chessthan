@@ -1,7 +1,7 @@
 "use client";
 
 import type { CustomSquares } from "@/types";
-import { Game } from "@chessu/types";
+import { Game } from "@/types_config/index";
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -266,7 +266,7 @@ export default function ArchivedGame({ game }: { game: Game }) {
                   onClick={copyLink}
                 >
                   <IconCopy size={16} />
-                  ches.su/archive/{game.id}
+                  chessthan/archive/{game.id}
                 </label>
                 <div tabIndex={0} className="dropdown-content badge badge-neutral text-xs shadow">
                   copied to clipboard

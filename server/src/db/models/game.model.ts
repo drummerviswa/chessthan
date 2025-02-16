@@ -1,4 +1,4 @@
-import type { Game, User } from "@chessu/types";
+import type { Game, User } from "../../types_config/index.d.ts";
 import { db } from "../index.js";
 
 export const activeGames: Game[] = [];

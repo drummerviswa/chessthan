@@ -1,4 +1,4 @@
-import type { Game, User } from "@chessu/types";
+import type { Game, User } from "../types_config/index.d.ts";
 import type { Request, Response } from "express";
 // import { nanoid } from "nanoid";
 
