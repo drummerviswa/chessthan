@@ -1,12 +1,14 @@
 "use client";
 // TODO: restructure, i could use some help with this :>
+import celeb from "public/celeb.json";
+import check from "public/check.json";
 
 import {
   IconChevronLeft,
   IconChevronRight,
   IconCopy,
   IconPlayerSkipBack,
-  IconPlayerSkipForward
+  IconPlayerSkipForward,
 } from "@tabler/icons-react";
 
 import type { FormEvent, KeyboardEvent } from "react";
@@ -28,6 +30,8 @@ import { io } from "socket.io-client";
 import { lobbyReducer, squareReducer } from "./reducers";
 import { initSocket } from "./socketEvents";
 import { syncPgn, syncSide } from "./utils";
+import "animate.css";
+import Lottie from "lottie-react";
 
 const socket = io(API_URL, { withCredentials: true, autoConnect: false });
 
@@ -37,14 +41,14 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   const [lobby, updateLobby] = useReducer(lobbyReducer, {
     ...initialLobby,
     actualGame: new Chess(),
-    side: "s"
+    side: "s",
   });
 
   const [customSquares, updateCustomSquares] = useReducer(squareReducer, {
     options: {},
     lastMove: {},
     rightClicked: {},
-    check: {}
+    check: {},
   });
 
   const [moveFrom, setMoveFrom] = useState<string | Square | null>(null);
@@ -59,8 +63,8 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   const [chatMessages, setChatMessages] = useState<Message[]>([
     {
       author: {},
-      message: `Have fun by invite your friends to spectate your spectacular game!`
-    }
+      message: `Have fun by invite your friends to spectate your spectacular game!`,
+    },
   ]);
   const chatListRef = useRef<HTMLUListElement>(null);
   const moveListRef = useRef<HTMLDivElement>(null);
@@ -74,7 +78,8 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
       !lobby.pgn ||
       !lobby.white ||
       !lobby.black ||
-      (lobby.white.id !== session?.user?.id && lobby.black.id !== session?.user?.id)
+      (lobby.white.id !== session?.user?.id &&
+        lobby.black.id !== session?.user?.id)
     )
       return;
 
@@ -83,17 +88,25 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
       setAbandonSeconds(60);
       interval = Number(
         setInterval(() => {
-          if (abandonSeconds === 0 || (lobby.white?.connected && lobby.black?.connected)) {
+          if (
+            abandonSeconds === 0 ||
+            (lobby.white?.connected && lobby.black?.connected)
+          ) {
             clearInterval(interval);
             return;
           }
           setAbandonSeconds((s) => s - 1);
-        }, 1000)
+        }, 1000),
       );
     }
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lobby.black, lobby.white, lobby.black?.disconnectedOn, lobby.white?.disconnectedOn]);
+  }, [
+    lobby.black,
+    lobby.white,
+    lobby.black?.disconnectedOn,
+    lobby.white?.disconnectedOn,
+  ]);
 
   useEffect(() => {
     if (!session?.user || !session.user?.id) return;
@@ -103,7 +116,11 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     handleResize();
 
     if (lobby.pgn && lobby.actualGame.pgn() !== lobby.pgn) {
-      syncPgn(lobby.pgn, lobby, { updateCustomSquares, setNavFen, setNavIndex });
+      syncPgn(lobby.pgn, lobby, {
+        updateCustomSquares,
+        setNavFen,
+        setNavIndex,
+      });
     }
 
     syncSide(session.user, undefined, lobby, { updateLobby });
@@ -114,7 +131,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
       updateCustomSquares,
       makeMove,
       setNavFen,
-      setNavIndex
+      setNavIndex,
     });
 
     return () => {
@@ -207,31 +224,37 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
         setNavIndex(null);
         updateLobby({
           type: "updateLobby",
-          payload: { pgn: lobby.actualGame.pgn() }
+          payload: { pgn: lobby.actualGame.pgn() },
         });
         updateTurnTitle();
         let kingSquare = undefined;
         if (lobby.actualGame.inCheck()) {
           const kingPos = lobby.actualGame.board().reduce((acc, row, index) => {
             const squareIndex = row.findIndex(
-              (square) => square && square.type === "k" && square.color === lobby.actualGame.turn()
+              (square) =>
+                square &&
+                square.type === "k" &&
+                square.color === lobby.actualGame.turn(),
             );
-            return squareIndex >= 0 ? `${String.fromCharCode(squareIndex + 97)}${8 - index}` : acc;
+            return squareIndex >= 0
+              ? `${String.fromCharCode(squareIndex + 97)}${8 - index}`
+              : acc;
           }, "");
           kingSquare = {
             [kingPos]: {
-              background: "radial-gradient(red, rgba(255,0,0,.4), transparent 70%)",
-              borderRadius: "50%"
-            }
+              background:
+                "radial-gradient(red, rgba(255,0,0,.4), transparent 70%)",
+              borderRadius: "50%",
+            },
           };
         }
         updateCustomSquares({
           lastMove: {
             [result.from]: { background: "rgba(255, 255, 0, 0.4)" },
-            [result.to]: { background: "rgba(255, 255, 0, 0.4)" }
+            [result.to]: { background: "rgba(255, 255, 0, 0.4)" },
           },
           options: {},
-          check: kingSquare
+          check: kingSquare,
         });
         return true;
       } else {
@@ -239,7 +262,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
       }
     } catch (err) {
       updateCustomSquares({
-        options: {}
+        options: {},
       });
       return false;
     }
@@ -250,7 +273,8 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   }
 
   function onDrop(sourceSquare: Square, targetSquare: Square) {
-    if (lobby.side === "s" || navFen || lobby.endReason || lobby.winner) return false;
+    if (lobby.side === "s" || navFen || lobby.endReason || lobby.winner)
+      return false;
 
     // premove
     if (lobby.side !== lobby.actualGame.turn()) return true;
@@ -258,7 +282,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     const moveDetails = {
       from: sourceSquare,
       to: targetSquare,
-      promotion: "q"
+      promotion: "q",
     };
 
     const move = makeMove(moveDetails);
@@ -270,7 +294,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   function getMoveOptions(square: Square) {
     const moves = lobby.actualGame.moves({
       square,
-      verbose: true
+      verbose: true,
     }) as Move[];
     if (moves.length === 0) {
       return;
@@ -283,21 +307,28 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
       newSquares[move.to] = {
         background:
           lobby.actualGame.get(move.to as Square) &&
-          lobby.actualGame.get(move.to as Square)?.color !== lobby.actualGame.get(square)?.color
+          lobby.actualGame.get(move.to as Square)?.color !==
+            lobby.actualGame.get(square)?.color
             ? "radial-gradient(circle, rgba(0,0,0,.1) 85%, transparent 85%)"
             : "radial-gradient(circle, rgba(0,0,0,.1) 25%, transparent 25%)",
-        borderRadius: "50%"
+        borderRadius: "50%",
       };
       return move;
     });
     newSquares[square] = {
-      background: "rgba(255, 255, 0, 0.4)"
+      background: "rgba(255, 255, 0, 0.4)",
     };
     updateCustomSquares({ options: newSquares });
   }
 
   function onPieceDragBegin(_piece: string, sourceSquare: Square) {
-    if (lobby.side !== lobby.actualGame.turn() || navFen || lobby.endReason || lobby.winner) return;
+    if (
+      lobby.side !== lobby.actualGame.turn() ||
+      navFen ||
+      lobby.endReason ||
+      lobby.winner
+    )
+      return;
 
     getMoveOptions(sourceSquare);
   }
@@ -308,7 +339,13 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
 
   function onSquareClick(square: Square) {
     updateCustomSquares({ rightClicked: {} });
-    if (lobby.side !== lobby.actualGame.turn() || navFen || lobby.endReason || lobby.winner) return;
+    if (
+      lobby.side !== lobby.actualGame.turn() ||
+      navFen ||
+      lobby.endReason ||
+      lobby.winner
+    )
+      return;
 
     function resetFirstMove(square: Square) {
       setMoveFrom(square);
@@ -324,7 +361,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     const moveDetails = {
       from: moveFrom,
       to: square,
-      promotion: "q"
+      promotion: "q",
     };
 
     const move = makeMove(moveDetails);
@@ -345,8 +382,8 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
           customSquares.rightClicked[square] &&
           customSquares.rightClicked[square]?.backgroundColor === colour
             ? undefined
-            : { backgroundColor: colour }
-      }
+            : { backgroundColor: colour },
+      },
     });
   }
 
@@ -362,9 +399,15 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
         <a
           className={
             (lobby.black?.name ? "font-bold" : "") +
-            (typeof lobby.black?.id === "number" ? " text-primary link-hover" : " cursor-default")
+            (typeof lobby.black?.id === "number"
+              ? " text-primary link-hover"
+              : " cursor-default")
           }
-          href={typeof lobby.black?.id === "number" ? `/user/${lobby.black?.name}` : undefined}
+          href={
+            typeof lobby.black?.id === "number"
+              ? `/user/${lobby.black?.name}`
+              : undefined
+          }
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -383,9 +426,15 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
         <a
           className={
             (lobby.white?.name ? "font-bold" : "") +
-            (typeof lobby.white?.id === "number" ? " text-primary link-hover" : " cursor-default")
+            (typeof lobby.white?.id === "number"
+              ? " text-primary link-hover"
+              : " cursor-default")
           }
-          href={typeof lobby.white?.id === "number" ? `/user/${lobby.white?.name}` : undefined}
+          href={
+            typeof lobby.white?.id === "number"
+              ? `/user/${lobby.white?.name}`
+              : undefined
+          }
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -433,13 +482,15 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
           <td
             className={
               "btn btn-ghost btn-xs h-full w-2/5 font-normal normal-case" +
-              ((history.indexOf(moves[0]) === history.length - 1 && navIndex === null) ||
+              ((history.indexOf(moves[0]) === history.length - 1 &&
+                navIndex === null) ||
               navIndex === history.indexOf(moves[0])
                 ? " btn-active pointer-events-none rounded-none"
                 : "")
             }
             id={
-              (history.indexOf(moves[0]) === history.length - 1 && navIndex === null) ||
+              (history.indexOf(moves[0]) === history.length - 1 &&
+                navIndex === null) ||
               navIndex === history.indexOf(moves[0])
                 ? "activeNavMove"
                 : ""
@@ -452,13 +503,15 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
             <td
               className={
                 "btn btn-ghost btn-xs h-full w-2/5 font-normal normal-case" +
-                ((history.indexOf(moves[1]) === history.length - 1 && navIndex === null) ||
+                ((history.indexOf(moves[1]) === history.length - 1 &&
+                  navIndex === null) ||
                 navIndex === history.indexOf(moves[1])
                   ? " btn-active pointer-events-none rounded-none"
                   : "")
               }
               id={
-                (history.indexOf(moves[1]) === history.length - 1 && navIndex === null) ||
+                (history.indexOf(moves[1]) === history.length - 1 &&
+                  navIndex === null) ||
                 navIndex === history.indexOf(moves[1])
                   ? "activeNavMove"
                   : ""
@@ -476,7 +529,11 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   function navigateMove(index: number | null | "prev") {
     const history = lobby.actualGame.history({ verbose: true });
 
-    if (index === null || (index !== "prev" && index >= history.length - 1) || !history.length) {
+    if (
+      index === null ||
+      (index !== "prev" && index >= history.length - 1) ||
+      !history.length
+    ) {
       // last move
       setNavIndex(null);
       setNavFen(null);
@@ -503,7 +560,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
 
     return {
       [history[navIndex].from]: { background: "rgba(255, 255, 0, 0.4)" },
-      [history[navIndex].to]: { background: "rgba(255, 255, 0, 0.4)" }
+      [history[navIndex].to]: { background: "rgba(255, 255, 0, 0.4)" },
     };
   }
 
@@ -520,241 +577,285 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     }
     socket.emit("claimAbandoned", type);
   }
-
+  console.log("Lobby", lobby);
+  console.log("Session", session);
   return (
-    <div className="flex w-full flex-wrap justify-center gap-6 px-4 py-4 lg:gap-10 2xl:gap-16">
-      <div className="relative h-min">
-        {/* overlay */}
-        {(!lobby.white?.id || !lobby.black?.id) && (
-          <div className="absolute bottom-0 right-0 top-0 z-10 flex h-full w-full items-center justify-center bg-black bg-opacity-70">
-            <div className="bg-base-200 flex w-full items-center justify-center gap-4 px-2 py-4">
-              Waiting for opponent.
-              {session?.user?.id !== lobby.white?.id && session?.user?.id !== lobby.black?.id && (
-                <button
-                  className={"btn btn-secondary" + (playBtnLoading ? " btn-disabled" : "")}
-                  onClick={clickPlay}
-                >
-                  Play as {lobby.white?.id ? "black" : "white"}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        <Chessboard
-          boardWidth={boardWidth}
-          customDarkSquareStyle={{ backgroundColor: "#9dc4d1" }}
-          customLightSquareStyle={{ backgroundColor: "#FAFAFF" }}
-          position={navFen || lobby.actualGame.fen()}
-          boardOrientation={lobby.side === "b" ? "black" : "white"}
-          isDraggablePiece={isDraggablePiece}
-          onPieceDragBegin={onPieceDragBegin}
-          onPieceDragEnd={onPieceDragEnd}
-          onPieceDrop={onDrop}
-          onSquareClick={onSquareClick}
-          onSquareRightClick={onSquareRightClick}
-          arePremovesAllowed={!navFen}
-          customSquareStyles={{
-            ...(navIndex === null ? customSquares.lastMove : getNavMoveSquares()),
-            ...(navIndex === null ? customSquares.check : {}),
-            ...customSquares.rightClicked,
-            ...(navIndex === null ? customSquares.options : {})
-          }}
-          ref={chessboardRef}
+    <div className="flex flex-col items-center justify-center w-full h-full gap-4">
+      {(lobby.winner === "black" && lobby?.black?.id === session?.user?.id) ||
+      (lobby.winner === "white" && lobby?.white?.id === session?.user?.id) ? (
+        <Lottie
+          animationData={celeb}
+          className="flex justify-center items-center absolute top-0 left-0 w-full h-full z-0"
+          loop={true}
         />
-      </div>
-
-      <div className="flex max-w-lg flex-1 flex-col items-center justify-center gap-4">
-        <div className="mb-auto flex w-full p-2">
-          <div className="flex flex-1 flex-col items-center justify-between">
-            {getPlayerHtml("top")}
-            <div className="my-auto w-full text-sm">vs</div>
-            {getPlayerHtml("bottom")}
-          </div>
-
-          <div className="flex flex-1 flex-col gap-1">
-            <div className="mb-2 flex w-full flex-col items-end gap-1">
-              {lobby.endReason ? "Archived link:" : "Invite friends:"}
-              <div
-                className={
-                  "dropdown dropdown-top dropdown-end" + (copiedLink ? " dropdown-open" : "")
-                }
-              >
-                <label
-                  tabIndex={0}
-                  className="badge badge-md bg-base-300 text-base-content h-8 gap-1 font-mono text-xs sm:h-5 sm:text-sm"
-                  onClick={copyInvite}
-                >
-                  <IconCopy size={16} />
-                  chessthan/{lobby.endReason ? `archive/${lobby.id}` : initialLobby.code}
-                </label>
-                <div tabIndex={0} className="dropdown-content badge badge-neutral text-xs shadow">
-                  copied to clipboard
-                </div>
+      ) : lobby.winner&&(
+        <div className="flex flex-row items-center justify-center gap-4">
+          <h1>Better luck next time!!</h1>
+          <Lottie animationData={check}
+          className="flex justify-center items-center"
+          loop={true} />
+        </div>
+      )}
+      <div className="flex w-full flex-wrap justify-center gap-6 px-4 py-4 lg:gap-10 2xl:gap-16 animate__animated animate__fadeIn">
+        <div className="relative h-min animate__animated animate__slideInUp">
+          {/* overlay */}
+          {(!lobby.white?.id || !lobby.black?.id) && (
+            <div className="absolute bottom-0 right-0 top-0 z-10 flex h-full w-full items-center justify-center bg-black bg-opacity-70">
+              <div className="bg-base-200 flex w-full items-center justify-center gap-4 px-2 py-4">
+                Waiting for opponent.
+                {session?.user?.id !== lobby.white?.id &&
+                  session?.user?.id !== lobby.black?.id && (
+                    <button
+                      className={
+                        "btn btn-secondary" +
+                        (playBtnLoading ? " btn-disabled" : "")
+                      }
+                      onClick={clickPlay}
+                    >
+                      Play as {lobby.white?.id ? "black" : "white"}
+                    </button>
+                  )}
               </div>
             </div>
-            <div className="h-32 w-full overflow-y-scroll" ref={moveListRef}>
-              <table className="table-compact table w-full">
-                <tbody>{getMoveListHtml()}</tbody>
-              </table>
-            </div>
-            <div className="flex h-4 w-full">
-              <button
-                className={
-                  "btn btn-sm flex-grow rounded-r-none" +
-                  (navIndex === 0 || lobby.actualGame.history().length <= 1 ? " btn-disabled" : "")
-                }
-                onClick={() => navigateMove(0)}
-              >
-                <IconPlayerSkipBack size={18} />
-              </button>
-              <button
-                className={
-                  "btn btn-sm flex-grow rounded-none" +
-                  (navIndex === 0 || lobby.actualGame.history().length <= 1 ? " btn-disabled" : "")
-                }
-                onClick={() => navigateMove(navIndex === null ? "prev" : navIndex - 1)}
-              >
-                <IconChevronLeft size={18} />
-              </button>
-              <button
-                className={
-                  "btn btn-sm flex-grow rounded-none" + (navIndex === null ? " btn-disabled" : "")
-                }
-                onClick={() => navigateMove(navIndex === null ? null : navIndex + 1)}
-              >
-                <IconChevronRight size={18} />
-              </button>
-              <button
-                className={
-                  "btn btn-sm flex-grow rounded-l-none" + (navIndex === null ? " btn-disabled" : "")
-                }
-                onClick={() => navigateMove(null)}
-              >
-                <IconPlayerSkipForward size={18} />
-              </button>
-            </div>
-          </div>
+          )}
+          <Chessboard
+            boardWidth={boardWidth}
+            customDarkSquareStyle={{ backgroundColor: "#9dc4d1" }}
+            customLightSquareStyle={{ backgroundColor: "#FAFAFF" }}
+            position={navFen || lobby.actualGame.fen()}
+            boardOrientation={lobby.side === "b" ? "black" : "white"}
+            isDraggablePiece={isDraggablePiece}
+            onPieceDragBegin={onPieceDragBegin}
+            onPieceDragEnd={onPieceDragEnd}
+            onPieceDrop={onDrop}
+            onSquareClick={onSquareClick}
+            onSquareRightClick={onSquareRightClick}
+            arePremovesAllowed={!navFen}
+            customSquareStyles={{
+              ...(navIndex === null
+                ? customSquares.lastMove
+                : getNavMoveSquares()),
+              ...(navIndex === null ? customSquares.check : {}),
+              ...customSquares.rightClicked,
+              ...(navIndex === null ? customSquares.options : {}),
+            }}
+            ref={chessboardRef}
+          />
         </div>
+        <div className="flex max-w-lg flex-1 flex-col items-center justify-center gap-4">
+          <div className="mb-auto flex w-full p-2">
+            <div className="flex flex-1 flex-col items-center justify-between">
+              {getPlayerHtml("top")}
+              <div className="my-auto w-full text-sm">vs</div>
+              {getPlayerHtml("bottom")}
+            </div>
 
-        <div className="relative h-60 w-full min-w-fit">
-          {(lobby.endReason ||
-            (lobby.pgn &&
-              lobby.white &&
-              session?.user?.id === lobby.white?.id &&
-              lobby.black &&
-              !lobby.black?.connected) ||
-            (lobby.pgn &&
-              lobby.black &&
-              session?.user?.id === lobby.black?.id &&
-              lobby.white &&
-              !lobby.white?.connected)) && (
-            <div className="bg-neutral absolute w-full rounded-t-lg bg-opacity-95 p-2">
-              {lobby.endReason ? (
-                <div>
-                  {lobby.endReason === "abandoned"
-                    ? lobby.winner === "draw"
-                      ? `The game ended in a draw due to abandonment.`
-                      : `The game was won by ${lobby.winner} due to abandonment.`
-                    : lobby.winner === "draw"
-                      ? "The game ended in a draw."
-                      : `The game was won by checkmate (${lobby.winner}).`}{" "}
-                  <br />
-                  You can review the archived game at{" "}
-                  <a
-                    className="link"
-                    href={`/archive/${lobby.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+            <div className="flex flex-1 flex-col gap-1">
+              <div className="mb-2 flex w-full flex-col items-end gap-1">
+                {lobby.endReason ? "Archived link:" : "Invite friends:"}
+                <div
+                  className={
+                    "dropdown dropdown-top dropdown-end" +
+                    (copiedLink ? " dropdown-open" : "")
+                  }
+                >
+                  <label
+                    tabIndex={0}
+                    className="badge badge-md bg-base-300 text-base-content h-8 gap-1 font-mono text-xs sm:h-5 sm:text-sm"
+                    onClick={copyInvite}
                   >
-                    chessthan/archive/{lobby.id}
-                  </a>
-                  .
-                </div>
-              ) : abandonSeconds > 0 ? (
-                `Your opponent has disconnected. You can claim the win or draw in ${abandonSeconds} second${
-                  abandonSeconds > 1 ? "s" : ""
-                }.`
-              ) : (
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <span>Your opponent has disconnected.</span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => claimAbandoned("win")}
-                      className="btn btn-sm btn-primary"
-                    >
-                      Claim win
-                    </button>
-                    <button onClick={() => claimAbandoned("draw")} className="btn btn-sm btn-ghost">
-                      Draw
-                    </button>
+                    <IconCopy size={16} />
+                    chessthan/
+                    {lobby.endReason
+                      ? `archive/${lobby.id}`
+                      : initialLobby.code}
+                  </label>
+                  <div
+                    tabIndex={0}
+                    className="dropdown-content badge badge-neutral text-xs shadow"
+                  >
+                    copied to clipboard
                   </div>
                 </div>
-              )}
-            </div>
-          )}
-          <div className="bg-base-300 flex h-full w-full min-w-[64px] flex-col rounded-lg p-4 shadow-sm">
-            <ul
-              className="mb-4 flex h-full flex-col gap-1 overflow-y-scroll break-words"
-              ref={chatListRef}
-            >
-              {chatMessages.map((m, i) => (
-                <li
+              </div>
+              <div className="h-32 w-full overflow-y-scroll" ref={moveListRef}>
+                <table className="table-compact table w-full">
+                  <tbody>{getMoveListHtml()}</tbody>
+                </table>
+              </div>
+              <div className="flex h-4 w-full">
+                <button
                   className={
-                    "max-w-[30rem]" +
-                    (!m.author.id && m.author.name === "server"
-                      ? " bg-base-content text-base-300 p-2"
+                    "btn btn-sm flex-grow rounded-r-none" +
+                    (navIndex === 0 || lobby.actualGame.history().length <= 1
+                      ? " btn-disabled"
                       : "")
                   }
-                  key={i}
+                  onClick={() => navigateMove(0)}
                 >
-                  <span>
-                    {m.author.id && (
-                      <span>
-                        <a
-                          className={
-                            "font-bold" +
-                            (typeof m.author.id === "number"
-                              ? " text-primary link-hover"
-                              : " cursor-default")
-                          }
-                          href={
-                            typeof m.author.id === "number" ? `/user/${m.author.name}` : undefined
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {m.author.name}
-                        </a>
-                        :{" "}
-                      </span>
-                    )}
-                    <span>{m.message}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <form className="input-group mt-auto" onSubmit={chatClickSend}>
-              <input
-                type="text"
-                placeholder="Chat here..."
-                className="input input-bordered flex-grow"
-                name="chatInput"
-                id="chatInput"
-                onKeyUp={chatKeyUp}
-                required
-              />
-              <button className="btn btn-secondary ml-1" type="submit">
-                Send
-              </button>
-            </form>
+                  <IconPlayerSkipBack size={18} />
+                </button>
+                <button
+                  className={
+                    "btn btn-sm flex-grow rounded-none" +
+                    (navIndex === 0 || lobby.actualGame.history().length <= 1
+                      ? " btn-disabled"
+                      : "")
+                  }
+                  onClick={() =>
+                    navigateMove(navIndex === null ? "prev" : navIndex - 1)
+                  }
+                >
+                  <IconChevronLeft size={18} />
+                </button>
+                <button
+                  className={
+                    "btn btn-sm flex-grow rounded-none" +
+                    (navIndex === null ? " btn-disabled" : "")
+                  }
+                  onClick={() =>
+                    navigateMove(navIndex === null ? null : navIndex + 1)
+                  }
+                >
+                  <IconChevronRight size={18} />
+                </button>
+                <button
+                  className={
+                    "btn btn-sm flex-grow rounded-l-none" +
+                    (navIndex === null ? " btn-disabled" : "")
+                  }
+                  onClick={() => navigateMove(null)}
+                >
+                  <IconPlayerSkipForward size={18} />
+                </button>
+              </div>
+            </div>
           </div>
+
+          <div className="relative h-60 w-full min-w-fit">
+            {(lobby.endReason ||
+              (lobby.pgn &&
+                lobby.white &&
+                session?.user?.id === lobby.white?.id &&
+                lobby.black &&
+                !lobby.black?.connected) ||
+              (lobby.pgn &&
+                lobby.black &&
+                session?.user?.id === lobby.black?.id &&
+                lobby.white &&
+                !lobby.white?.connected)) && (
+              <div className="bg-neutral absolute w-full rounded-t-lg bg-opacity-95 p-2">
+                {lobby.endReason ? (
+                  <div>
+                    {lobby.endReason === "abandoned"
+                      ? lobby.winner === "draw"
+                        ? `The game ended in a draw due to abandonment.`
+                        : `The game was won by ${lobby.winner} due to abandonment.`
+                      : lobby.winner === "draw"
+                        ? "The game ended in a draw."
+                        : `The game was won by checkmate (${lobby.winner}).`}{" "}
+                    <br />
+                    You can review the archived game at{" "}
+                    <a
+                      className="link"
+                      href={`/archive/${lobby.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      chessthan/archive/{lobby.id}
+                    </a>
+                    .
+                  </div>
+                ) : abandonSeconds > 0 ? (
+                  `Your opponent has disconnected. You can claim the win or draw in ${abandonSeconds} second${
+                    abandonSeconds > 1 ? "s" : ""
+                  }.`
+                ) : (
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <span>Your opponent has disconnected.</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => claimAbandoned("win")}
+                        className="btn btn-sm btn-primary"
+                      >
+                        Claim win
+                      </button>
+                      <button
+                        onClick={() => claimAbandoned("draw")}
+                        className="btn btn-sm btn-ghost"
+                      >
+                        Draw
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="bg-base-300 flex h-full w-full min-w-[64px] flex-col rounded-lg p-4 shadow-sm">
+              <ul
+                className="mb-4 flex h-full flex-col gap-1 overflow-y-scroll break-words"
+                ref={chatListRef}
+              >
+                {chatMessages.map((m, i) => (
+                  <li
+                    className={
+                      "max-w-[30rem]" +
+                      (!m.author.id && m.author.name === "server"
+                        ? " bg-base-content text-base-300 p-2"
+                        : "")
+                    }
+                    key={i}
+                  >
+                    <span>
+                      {m.author.id && (
+                        <span>
+                          <a
+                            className={
+                              "font-bold" +
+                              (typeof m.author.id === "number"
+                                ? " text-primary link-hover"
+                                : " cursor-default")
+                            }
+                            href={
+                              typeof m.author.id === "number"
+                                ? `/user/${m.author.name}`
+                                : undefined
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {m.author.name}
+                          </a>
+                          :{" "}
+                        </span>
+                      )}
+                      <span>{m.message}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <form className="input-group mt-auto" onSubmit={chatClickSend}>
+                <input
+                  type="text"
+                  placeholder="Chat here..."
+                  className="input input-bordered flex-grow"
+                  name="chatInput"
+                  id="chatInput"
+                  onKeyUp={chatKeyUp}
+                  required
+                />
+                <button className="btn btn-secondary ml-1" type="submit">
+                  Send
+                </button>
+              </form>
+            </div>
+          </div>
+          {lobby.observers && lobby.observers.length > 0 && (
+            <div className="w-full px-2 text-xs md:px-0">
+              Spectators: {lobby.observers?.map((o) => o.name).join(", ")}
+            </div>
+          )}
         </div>
-        {lobby.observers && lobby.observers.length > 0 && (
-          <div className="w-full px-2 text-xs md:px-0">
-            Spectators: {lobby.observers?.map((o) => o.name).join(", ")}
-          </div>
-        )}
       </div>
     </div>
   );
