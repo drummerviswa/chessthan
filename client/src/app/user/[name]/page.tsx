@@ -1,6 +1,7 @@
 import CopyLink from "@/components/user/CopyLink";
 import { fetchProfileData } from "@/lib/user";
 import { notFound } from "next/navigation";
+import { Key, ReactElement, JSXElementConstructor, ReactNode, ReactPortal, AwaitedReactNode } from "react";
 
 export async function generateMetadata({ params }: { params: { name: string } }) {
   const data = await fetchProfileData(params.name);
@@ -64,7 +65,7 @@ export default async function Profile({ params }: { params: { name: string } }) 
       <div>
         <h2 className="mb-1 text-lg font-bold">Recent games</h2>
         <ul className="bg-base-300 flex h-[60vh] flex-col gap-1 overflow-y-scroll rounded-lg">
-          {data.recentGames.map((game) => {
+          {data.recentGames.map((game: { endReason: string; id: Key | null | undefined; winner: string; white: { id: any; name: string | number | bigint | boolean | ReactElement<any, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<AwaitedReactNode> | null | undefined; }; black: { id: any; name: string | number | bigint | boolean | ReactElement<any, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<AwaitedReactNode> | null | undefined; }; startedAt: number; endedAt: number; }) => {
             let endReason = game.endReason as string;
             if (endReason === "repetition") {
               endReason = "threefold repetition";
