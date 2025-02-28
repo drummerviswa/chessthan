@@ -38,7 +38,7 @@ Ensure you have the following installed:
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/yourusername/chessthan.git
+   git clone https://github.com/drummerviswa/chessthan.git
    cd chessthan
    ```
 2. Install dependencies  
