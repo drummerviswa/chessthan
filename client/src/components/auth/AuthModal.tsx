@@ -1,13 +1,15 @@
 "use client";
 
 import { SessionContext } from "@/context/session";
-import { logout, setGuestSession } from "@/lib/auth";
+import { login, logout, register, setGuestSession } from "@/lib/auth";
 import Link from "next/link";
 import type { FormEvent } from "react";
 import { useContext, useEffect, useRef, useState } from "react";
 
 import { IconSettings2, IconUserCircle } from "@tabler/icons-react";
 import Guest from "./Guest";
+import Login from "./Login";
+import Register from "./Register";
 
 export default function AuthModal() {
   const session = useContext(SessionContext);
@@ -42,6 +44,50 @@ export default function AuthModal() {
         }
       }
       guestName.value = "";
+    } else if (activeTab === "login") {
+      const loginName = target.elements.namedItem("loginName") as HTMLInputElement;
+      const loginPassword = target.elements.namedItem("loginPassword") as HTMLInputElement;
+      if (!loginName || !loginName.value || !loginPassword || !loginPassword.value) return;
+
+      setButtonLoading(true);
+      const user = await login(loginName.value, loginPassword.value);
+      if (typeof user === "string") {
+        setServerMessage(user);
+      } else if (user?.id) {
+        session?.setUser(user);
+        if (serverMessage) {
+          setServerMessage(null);
+        }
+        if (modalToggleRef.current?.checked) {
+          modalToggleRef.current.checked = false;
+        }
+      }
+    } else if (activeTab === "register") {
+      const registerName = target.elements.namedItem("registerName") as HTMLInputElement;
+      const registerEmail = target.elements.namedItem("registerEmail") as HTMLInputElement;
+      const registerPassword = target.elements.namedItem("registerPassword") as HTMLInputElement;
+      if (!registerName || !registerName.value || !registerPassword || !registerPassword.value) {
+        return;
+      }
+
+      setButtonLoading(true);
+      const user = await register(
+        registerName.value,
+        registerPassword.value,
+        registerEmail.value || undefined
+      );
+
+      if (typeof user === "string") {
+        setServerMessage(user);
+      } else if (user?.id) {
+        session?.setUser(user);
+        if (serverMessage) {
+          setServerMessage(null);
+        }
+        if (modalToggleRef.current?.checked) {
+          modalToggleRef.current.checked = false;
+        }
+      }
     }
     setButtonLoading(false);
   }
@@ -94,10 +140,50 @@ export default function AuthModal() {
             </div>
           ) : (
             <>
+              <div className="tabs flex-nowap w-full">
+                <span
+                  onClick={() => {
+                    setActiveTab("guest");
+                  }}
+                  className={
+                    "tab tab-bordered tab-border-2 flex-grow rounded-tl-lg" +
+                    (activeTab === "guest"
+                      ? " tab-active text-base-content"
+                      : " text-base-content border-opacity-10 hover:border-opacity-30")
+                  }
+                >
+                  Guest
+                </span>
+                <span
+                  onClick={() => setActiveTab("login")}
+                  className={
+                    "tab tab-bordered tab-border-2 flex-grow rounded-tl-lg" +
+                    (activeTab === "login"
+                      ? " tab-active"
+                      : " text-base-content border-opacity-10 hover:border-opacity-30")
+                  }
+                >
+                  Login
+                </span>
+                <span
+                  onClick={() => setActiveTab("register")}
+                  className={
+                    "tab tab-bordered tab-border-2 flex-grow rounded-tl-lg" +
+                    (activeTab === "register"
+                      ? " tab-active"
+                      : " text-base-content border-opacity-10 hover:border-opacity-30")
+                  }
+                >
+                  Register
+                </span>
+              </div>
+
               <form className="flex flex-col px-2" onSubmit={submitAuth}>
                 {activeTab === "guest" && (
                   <Guest currentName={session?.user?.name || "unknown user"} />
                 )}
+                {activeTab === "login" && <Login />}
+                {activeTab === "register" && <Register />}
 
                 {serverMessage && <div className="text-error mt-2">{serverMessage}</div>}
                 <div className="modal-action items-center">
@@ -108,6 +194,8 @@ export default function AuthModal() {
                   )}
                   <button className={"btn" + (buttonLoading ? " loading" : "")} type="submit">
                     {activeTab === "guest" && "Confirm"}
+                    {activeTab === "login" && "Login"}
+                    {activeTab === "register" && "Register"}
                   </button>
                 </div>
               </form>

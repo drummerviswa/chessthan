@@ -1,8 +1,11 @@
 import type { Game, User } from "../types_config/index.d.ts";
 import type { Request, Response } from "express";
+const __dirname = path.resolve();
 // import { nanoid } from "nanoid";
 
 import GameModel, { activeGames } from "../db/models/game.model.js";
+import { promises as fs } from "fs";
+import path from "path";
 
 export const getGames = async (req: Request, res: Response) => {
     try {
@@ -64,14 +67,20 @@ export const getActiveGame = async (req: Request, res: Response) => {
         res.status(500).end();
     }
 };
+const readWordList = async () => {
+    const filePath = path.resolve(__dirname, "assets/wordlist.txt");
+    const wL = await fs.readFile(filePath, "utf-8");
+    return wL.split("\n").map(word => word.trim()).filter(Boolean);
+};
+
 async function generateRandomWord() {
     try {
-        const response = await fetch("https://random-word-api.herokuapp.com/word");
-        const data = await response.json();
-        return data[0]; // API returns an array with a single word
+        const wordList = await readWordList();
+        const randomIndex = Math.floor(Math.random() * wordList.length);
+        return wordList[randomIndex];
     } catch (error) {
         console.error("Error fetching random word:", error);
-        return "defaultword"; // Fallback in case of error
+        return "defaultword";
     }
 }
 export const createGame = async (req: Request, res: Response) => {
