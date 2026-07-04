@@ -5,9 +5,7 @@ export const db = new pg.Pool({
     database: process.env.PGDATABASE,
     password: process.env.PGPASSWORD,
     port: process.env.PGPORT ? parseInt(process.env.PGPORT) : 29016,
-    ssl: {
-        rejectUnauthorized: false
-    }
+    ssl: false
 });
 export const INIT_TABLES = /* sql */ `
     CREATE TABLE IF NOT EXISTS "user" (

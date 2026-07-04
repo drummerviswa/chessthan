@@ -45,7 +45,7 @@ io.use((socket, next) => {
     }
 });
 initSocket();
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 5000;
 server.listen(port, () => {
     console.log(`chessthan api server listening on :${port}`);
 });
