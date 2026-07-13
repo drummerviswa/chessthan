@@ -35,6 +35,7 @@ model User {
   blackGames    Game[]   @relation("BlackPlayer")
   eloHistory    EloHistory[]
   puzzleHistory UserPuzzleHistory[]
+  coachProfile  CoachProfile?
 
   @@map("user")
 }
@@ -92,4 +93,18 @@ model UserPuzzleHistory {
   puzzle     Puzzle   @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
 
   @@map("user_puzzle_history")
+}
+
+model CoachProfile {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique @map("user_id")
+  title       String   @db.VarChar(16) // "GM", "IM", "FM", "WGM", "WIM", "Coach"
+  rate        Int      @default(0) // Hourly rate in INR
+  description String   @db.Text
+  elo         Int      @default(2000)
+  availability String  @db.Text // JSON string representing availability blocks
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("coach_profile")
 }

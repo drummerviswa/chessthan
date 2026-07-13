@@ -5,6 +5,8 @@ const router = Router();
 
 router.route("/leaderboard/elo").get(controller.getEloLeaderboard);
 router.route("/leaderboard/leagues").get(controller.getLeagueLeaderboard);
+router.route("/coaches/list").get(controller.listCoaches);
+router.route("/coaches/book").post(controller.bookCoachSession);
 router.route("/:name").get(controller.getUserProfile);
 
 export default router;

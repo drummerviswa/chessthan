@@ -47,6 +47,12 @@ export default function Sidebar() {
             active: pathname === "/trainer"
         },
         {
+            label: "Coaches",
+            href: "/coaches",
+            icon: IconCrown,
+            active: pathname === "/coaches"
+        },
+        {
             label: "Puzzles",
             href: "/puzzles",
             icon: IconPuzzle,
