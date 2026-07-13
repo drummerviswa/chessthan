@@ -34,6 +34,7 @@ import "animate.css";
 import Lottie from "lottie-react";
 import { playSound, triggerHaptic } from "@/lib/audioEffects";
 import GameResultModal from "./GameResultModal";
+import { evaluateBoard } from "@/lib/localEngine";
 
 const socket = io(API_URL, { withCredentials: true, autoConnect: false });
 
@@ -64,6 +65,20 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
   const [boardTheme, setBoardTheme] = useState({ dark: "#4b7399", light: "#eae9d2" });
+
+  const [evalScore, setEvalScore] = useState<number>(0);
+  const [showEval, setShowEval] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!lobby.actualGame) return;
+    try {
+      const activeFen = navFen || lobby.actualGame.fen();
+      const scoreVal = evaluateBoard(new Chess(activeFen));
+      setEvalScore(scoreVal / 100);
+    } catch (e) {
+      // safe fallback
+    }
+  }, [lobby.pgn, navFen, lobby.actualGame]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -640,50 +655,77 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
         </div>
       )}
       <div className="flex w-full flex-wrap justify-center gap-6 px-4 py-4 lg:gap-10 2xl:gap-16 animate__animated animate__fadeIn">
-        <div className="relative h-min animate__animated animate__slideInUp">
-          {/* overlay */}
-          {(!lobby.white?.id || !lobby.black?.id) && (
-            <div className="absolute bottom-0 right-0 top-0 z-10 flex h-full w-full items-center justify-center bg-black bg-opacity-70">
-              <div className="bg-base-200 flex w-full items-center justify-center gap-4 px-2 py-4">
-                Waiting for opponent.
-                {session?.user?.id !== lobby.white?.id &&
-                  session?.user?.id !== lobby.black?.id && (
-                    <button
-                      className={
-                        "btn btn-secondary" +
-                        (playBtnLoading ? " btn-disabled" : "")
-                      }
-                      onClick={clickPlay}
-                    >
-                      Play as {lobby.white?.id ? "black" : "white"}
-                    </button>
-                  )}
-              </div>
+        <div className="flex items-stretch gap-3 relative h-min animate__animated animate__slideInUp">
+          
+          {/* Live Evaluation Bar */}
+          {showEval && (
+            <div 
+              className="w-4 bg-slate-300 rounded-lg overflow-hidden flex flex-col relative border border-base-300 shadow-inner shrink-0"
+              style={{ height: `${boardWidth}px` }}
+            >
+              {/* Black advantage (top fill) */}
+              <div className="flex-1 bg-neutral-900 transition-all duration-300" />
+              
+              {/* White advantage (bottom fill) */}
+              <div 
+                className="bg-white transition-all duration-300"
+                style={{ height: `${((Math.max(-8, Math.min(evalScore, 8)) + 8) / 16) * 100}%` }}
+              />
+
+              {/* Text label */}
+              <span className={`absolute left-0 right-0 text-center font-mono text-[7px] font-bold ${
+                evalScore >= 0 ? "bottom-1 text-black" : "top-1 text-white"
+              }`}>
+                {evalScore > 0 ? `+${evalScore.toFixed(1)}` : evalScore.toFixed(1)}
+              </span>
             </div>
           )}
-          <Chessboard
-            boardWidth={boardWidth}
-            customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
-            customLightSquareStyle={{ backgroundColor: boardTheme.light }}
-            position={navFen || lobby.actualGame.fen()}
-            boardOrientation={lobby.side === "b" ? "black" : "white"}
-            isDraggablePiece={isDraggablePiece}
-            onPieceDragBegin={onPieceDragBegin}
-            onPieceDragEnd={onPieceDragEnd}
-            onPieceDrop={onDrop}
-            onSquareClick={onSquareClick}
-            onSquareRightClick={onSquareRightClick}
-            arePremovesAllowed={!navFen}
-            customSquareStyles={{
-              ...(navIndex === null
-                ? customSquares.lastMove
-                : getNavMoveSquares()),
-              ...(navIndex === null ? customSquares.check : {}),
-              ...customSquares.rightClicked,
-              ...(navIndex === null ? customSquares.options : {}),
-            }}
-            ref={chessboardRef}
-          />
+
+          <div className="relative" style={{ width: `${boardWidth}px`, height: `${boardWidth}px` }}>
+            {/* overlay */}
+            {(!lobby.white?.id || !lobby.black?.id) && (
+              <div className="absolute bottom-0 right-0 top-0 z-10 flex h-full w-full items-center justify-center bg-black bg-opacity-70">
+                <div className="bg-base-200 flex w-full items-center justify-center gap-4 px-2 py-4">
+                  Waiting for opponent.
+                  {session?.user?.id !== lobby.white?.id &&
+                    session?.user?.id !== lobby.black?.id && (
+                      <button
+                        className={
+                          "btn btn-secondary" +
+                          (playBtnLoading ? " btn-disabled" : "")
+                        }
+                        onClick={clickPlay}
+                      >
+                        Play as {lobby.white?.id ? "black" : "white"}
+                      </button>
+                    )}
+                </div>
+              </div>
+            )}
+            <Chessboard
+              boardWidth={boardWidth}
+              customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
+              customLightSquareStyle={{ backgroundColor: boardTheme.light }}
+              position={navFen || lobby.actualGame.fen()}
+              boardOrientation={lobby.side === "b" ? "black" : "white"}
+              isDraggablePiece={isDraggablePiece}
+              onPieceDragBegin={onPieceDragBegin}
+              onPieceDragEnd={onPieceDragEnd}
+              onPieceDrop={onDrop}
+              onSquareClick={onSquareClick}
+              onSquareRightClick={onSquareRightClick}
+              arePremovesAllowed={!navFen}
+              customSquareStyles={{
+                ...(navIndex === null
+                  ? customSquares.lastMove
+                  : getNavMoveSquares()),
+                ...(navIndex === null ? customSquares.check : {}),
+                ...customSquares.rightClicked,
+                ...(navIndex === null ? customSquares.options : {}),
+              }}
+              ref={chessboardRef}
+            />
+          </div>
         </div>
         <div className="flex max-w-lg flex-1 flex-col items-center justify-center gap-4">
           <div className="mb-auto flex w-full p-2">
@@ -772,6 +814,18 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
                   <IconPlayerSkipForward size={18} />
                 </button>
               </div>
+
+              {/* Live Position Analysis Toggle */}
+              <div className="flex items-center justify-between bg-base-200 p-2.5 rounded-lg border border-base-300 text-xs mt-3">
+                <span className="font-bold text-base-content/60">Live Position Analysis</span>
+                <input
+                  type="checkbox"
+                  className="toggle toggle-primary toggle-xs"
+                  checked={showEval}
+                  onChange={(e) => setShowEval(e.target.checked)}
+                />
+              </div>
+
             </div>
           </div>
 
