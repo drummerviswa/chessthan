@@ -94,6 +94,27 @@ function LocalPageContent() {
     const [gameStatus, setGameStatus] = useState<string>("White to move");
     const [isGameOver, setIsGameOver] = useState(false);
     
+    // Theme loader
+    const [boardTheme, setBoardTheme] = useState({ dark: "#4b7399", light: "#eae9d2" });
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const savedTheme = localStorage.getItem("chessthan:boardTheme");
+            if (savedTheme) {
+                const THEMES = [
+                    { id: "emerald", dark: "#4b7399", light: "#eae9d2" },
+                    { id: "wood", dark: "#b58863", light: "#f0d9b5" },
+                    { id: "glass", dark: "#5e81ac", light: "#eceff4" },
+                    { id: "slate", dark: "#475569", light: "#cbd5e1" },
+                    { id: "royal", dark: "#5b21b6", light: "#ede9fe" }
+                ];
+                const found = THEMES.find(t => t.id === savedTheme);
+                if (found) {
+                    setBoardTheme({ dark: found.dark, light: found.light });
+                }
+            }
+        }
+    }, []);
+    
     // Available Moves Dot indicators & selection states
     const [optionSquares, setOptionSquares] = useState<any>({});
     const [moveFrom, setMoveFrom] = useState<string>("");
@@ -505,8 +526,8 @@ function LocalPageContent() {
                         customBoardStyle={{
                             borderRadius: "0 0 0.75rem 0.75rem"
                         }}
-                        customDarkSquareStyle={{ backgroundColor: "#4b7399" }}
-                        customLightSquareStyle={{ backgroundColor: "#eae9d2" }}
+                        customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
+                        customLightSquareStyle={{ backgroundColor: boardTheme.light }}
                     />
                 </div>
             </div>

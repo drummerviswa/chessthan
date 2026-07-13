@@ -15,7 +15,8 @@ import {
     IconSettings,
     IconCrown,
     IconLogout,
-    IconLogin
+    IconLogin,
+    IconEye
 } from "@tabler/icons-react";
 
 export default function Sidebar() {
@@ -31,6 +32,12 @@ export default function Sidebar() {
             href: "/",
             icon: IconLayoutDashboard,
             active: pathname === "/"
+        },
+        {
+            label: "Analysis",
+            href: "/analysis",
+            icon: IconEye,
+            active: pathname === "/analysis"
         },
         {
             label: "Puzzles",

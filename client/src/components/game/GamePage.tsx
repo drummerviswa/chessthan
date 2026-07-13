@@ -63,6 +63,26 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   const [playBtnLoading, setPlayBtnLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
+  const [boardTheme, setBoardTheme] = useState({ dark: "#4b7399", light: "#eae9d2" });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("chessthan:boardTheme");
+      if (savedTheme) {
+        const THEMES = [
+          { id: "emerald", dark: "#4b7399", light: "#eae9d2" },
+          { id: "wood", dark: "#b58863", light: "#f0d9b5" },
+          { id: "glass", dark: "#5e81ac", light: "#eceff4" },
+          { id: "slate", dark: "#475569", light: "#cbd5e1" },
+          { id: "royal", dark: "#5b21b6", light: "#ede9fe" }
+        ];
+        const found = THEMES.find(t => t.id === savedTheme);
+        if (found) {
+          setBoardTheme({ dark: found.dark, light: found.light });
+        }
+      }
+    }
+  }, []);
 
   const [chatMessages, setChatMessages] = useState<Message[]>([
     {
@@ -643,8 +663,8 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
           )}
           <Chessboard
             boardWidth={boardWidth}
-            customDarkSquareStyle={{ backgroundColor: "#9dc4d1" }}
-            customLightSquareStyle={{ backgroundColor: "#FAFAFF" }}
+            customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
+            customLightSquareStyle={{ backgroundColor: boardTheme.light }}
             position={navFen || lobby.actualGame.fen()}
             boardOrientation={lobby.side === "b" ? "black" : "white"}
             isDraggablePiece={isDraggablePiece}
