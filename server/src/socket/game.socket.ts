@@ -174,6 +174,8 @@ export async function sendMove(this: Socket, m: { from: string; to: string; prom
     const chess = new Chess();
     if (game.pgn) {
         chess.loadPgn(game.pgn);
+    } else if (game.initialFen) {
+        chess.load(game.initialFen);
     }
 
     try {
@@ -191,28 +193,63 @@ export async function sendMove(this: Socket, m: { from: string; to: string; prom
         if (newMove) {
             game.pgn = chess.pgn();
             this.to(game.code as string).emit("receivedMove", m);
-            if (chess.isGameOver()) {
-                let reason: Game["endReason"];
-                if (chess.isCheckmate()) reason = "checkmate";
-                else if (chess.isStalemate()) reason = "stalemate";
-                else if (chess.isThreefoldRepetition()) reason = "repetition";
-                else if (chess.isInsufficientMaterial()) reason = "insufficient";
-                else if (chess.isDraw()) reason = "draw";
+
+            let variantVictory = false;
+            if (game.variant === "kingofthehill") {
+                const centerSquares = ["d4", "d5", "e4", "e5"];
+                if (newMove.piece === "k" && centerSquares.includes(newMove.to)) {
+                    game.winner = prevTurn === "w" ? "white" : "black";
+                    game.endReason = "checkmate";
+                    variantVictory = true;
+                }
+            }
+
+            if (game.variant === "threecheck" && chess.inCheck()) {
+                if (!game.checks) game.checks = { white: 0, black: 0 };
+                if (prevTurn === "w") {
+                    game.checks.white = (game.checks.white || 0) + 1;
+                    if (game.checks.white >= 3) {
+                        game.winner = "white";
+                        game.endReason = "checkmate";
+                        variantVictory = true;
+                    }
+                } else {
+                    game.checks.black = (game.checks.black || 0) + 1;
+                    if (game.checks.black >= 3) {
+                        game.winner = "black";
+                        game.endReason = "checkmate";
+                        variantVictory = true;
+                    }
+                }
+            }
+
+            if (variantVictory || chess.isGameOver()) {
+                let reason: Game["endReason"] = game.endReason;
+                if (!variantVictory) {
+                    if (chess.isCheckmate()) reason = "checkmate";
+                    else if (chess.isStalemate()) reason = "stalemate";
+                    else if (chess.isThreefoldRepetition()) reason = "repetition";
+                    else if (chess.isInsufficientMaterial()) reason = "insufficient";
+                    else if (chess.isDraw()) reason = "draw";
+                }
 
                 const winnerSide =
-                    reason === "checkmate" ? (prevTurn === "w" ? "white" : "black") : undefined;
+                    variantVictory ? game.winner : (reason === "checkmate" ? (prevTurn === "w" ? "white" : "black") : undefined);
                 const winnerName =
-                    reason === "checkmate"
-                        ? winnerSide === "white"
-                            ? game.white?.name
-                            : game.black?.name
-                        : undefined;
-                if (reason === "checkmate") {
-                    game.winner = winnerSide;
-                } else {
-                    game.winner = "draw";
+                    winnerSide === "white"
+                        ? game.white?.name
+                        : winnerSide === "black"
+                            ? game.black?.name
+                            : undefined;
+
+                if (!variantVictory) {
+                    if (reason === "checkmate") {
+                        game.winner = winnerSide;
+                    } else {
+                        game.winner = "draw";
+                    }
+                    game.endReason = reason;
                 }
-                game.endReason = reason;
 
                 const { id } = (await GameModel.save(game)) as Game; // save game to db
                 game.id = id;

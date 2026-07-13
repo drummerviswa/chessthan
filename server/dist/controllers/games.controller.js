@@ -2,6 +2,7 @@
 import GameModel, { activeGames } from "../db/models/game.model.js";
 import { generateThematicRoomCode } from "../utils/wordGenerator.js";
 import { explainMove, generateGameReview } from "../lib/aiCoach.js";
+import { generateChess960Fen } from "../utils/chess960.js";
 export const getGames = async (req, res) => {
     try {
         if (!req.query.id && !req.query.userid) {
@@ -81,12 +82,17 @@ export const createGame = async (req, res) => {
         while (activeGames.some((g) => g.code === code)) {
             code = generateThematicRoomCode();
         }
+        const variant = req.body.variant || "standard";
         const game = {
             code,
             unlisted,
             host: user,
-            pgn: ""
+            pgn: "",
+            variant
         };
+        if (variant === "chess960") {
+            game.initialFen = generateChess960Fen();
+        }
         if (req.body.side === "white") {
             game.white = user;
         }

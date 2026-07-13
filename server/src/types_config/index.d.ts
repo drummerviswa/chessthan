@@ -12,6 +12,9 @@ export interface Game {
     observers?: User[];
     startedAt?: number;
     endedAt?: number;
+    variant?: "standard" | "kingofthehill" | "threecheck" | "chess960";
+    initialFen?: string;
+    checks?: { white: number; black: number };
 }
 
 export interface User {

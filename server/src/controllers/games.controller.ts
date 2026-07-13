@@ -5,6 +5,7 @@ import type { Request, Response } from "express";
 import GameModel, { activeGames } from "../db/models/game.model.js";
 import { generateThematicRoomCode } from "../utils/wordGenerator.js";
 import { explainMove, generateGameReview } from "../lib/aiCoach.js";
+import { generateChess960Fen } from "../utils/chess960.js";
 
 export const getGames = async (req: Request, res: Response) => {
     try {
@@ -85,12 +86,17 @@ export const createGame = async (req: Request, res: Response) => {
             code = generateThematicRoomCode();
         }
 
+        const variant: Game["variant"] = req.body.variant || "standard";
         const game: Game = {
             code,
             unlisted,
             host: user,
-            pgn: ""
+            pgn: "",
+            variant
         };
+        if (variant === "chess960") {
+            game.initialFen = generateChess960Fen();
+        }
         if (req.body.side === "white") {
             game.white = user;
         } else if (req.body.side === "black") {

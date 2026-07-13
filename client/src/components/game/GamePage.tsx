@@ -42,7 +42,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
 
   const [lobby, updateLobby] = useReducer(lobbyReducer, {
     ...initialLobby,
-    actualGame: new Chess(),
+    actualGame: initialLobby.initialFen ? new Chess(initialLobby.initialFen) : new Chess(),
     side: "s",
   });
 

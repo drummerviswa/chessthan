@@ -1,7 +1,7 @@
 import { API_URL } from "@/config";
 import type { Game } from "@/types_config/index";
 
-export const createGame = async (side: string, unlisted: boolean) => {
+export const createGame = async (side: string, unlisted: boolean, variant?: string) => {
     try {
         const res = await fetch(`${API_URL}/v1/games`, {
             method: "POST",
@@ -9,7 +9,7 @@ export const createGame = async (side: string, unlisted: boolean) => {
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ side, unlisted }),
+            body: JSON.stringify({ side, unlisted, variant }),
             cache: "no-store"
         });
 
