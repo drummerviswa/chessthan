@@ -4,7 +4,7 @@ import type { Request, Response } from "express";
 
 import GameModel, { activeGames } from "../db/models/game.model.js";
 import { generateThematicRoomCode } from "../utils/wordGenerator.js";
-import { explainMove } from "../lib/aiCoach.js";
+import { explainMove, generateGameReview } from "../lib/aiCoach.js";
 
 export const getGames = async (req: Request, res: Response) => {
     try {
@@ -124,6 +124,22 @@ export const explainActiveMove = async (req: Request, res: Response) => {
         res.status(200).json({ explanation });
     } catch (err: unknown) {
         console.error("explainActiveMove controller error:", err);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const reviewFinishedGame = async (req: Request, res: Response) => {
+    try {
+        const { pgn } = req.body;
+        if (!pgn) {
+            res.status(400).json({ message: "pgn is required" });
+            return;
+        }
+
+        const review = await generateGameReview(pgn);
+        res.status(200).json({ review });
+    } catch (err: unknown) {
+        console.error("reviewFinishedGame controller error:", err);
         res.status(500).json({ message: "Internal server error" });
     }
 };

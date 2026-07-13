@@ -1,7 +1,7 @@
 // import { nanoid } from "nanoid";
 import GameModel, { activeGames } from "../db/models/game.model.js";
 import { generateThematicRoomCode } from "../utils/wordGenerator.js";
-import { explainMove } from "../lib/aiCoach.js";
+import { explainMove, generateGameReview } from "../lib/aiCoach.js";
 export const getGames = async (req, res) => {
     try {
         if (!req.query.id && !req.query.userid) {
@@ -122,6 +122,21 @@ export const explainActiveMove = async (req, res) => {
     }
     catch (err) {
         console.error("explainActiveMove controller error:", err);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+export const reviewFinishedGame = async (req, res) => {
+    try {
+        const { pgn } = req.body;
+        if (!pgn) {
+            res.status(400).json({ message: "pgn is required" });
+            return;
+        }
+        const review = await generateGameReview(pgn);
+        res.status(200).json({ review });
+    }
+    catch (err) {
+        console.error("reviewFinishedGame controller error:", err);
         res.status(500).json({ message: "Internal server error" });
     }
 };

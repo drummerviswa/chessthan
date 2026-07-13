@@ -44,3 +44,32 @@ Keep your explanation short and concise (2 to 3 sentences maximum). Explain why 
         return "Sorry, I could not generate an explanation for this move right now. Please try again later.";
     }
 }
+
+/**
+ * Generates a post-game summary review of the match PGN using Gemini
+ */
+export async function generateGameReview(pgn: string): Promise<string> {
+    if (!genAI) {
+        return `[Mock AI Review] This was a spectacular match. White led a strong initiative in the opening, but black created tactical counter-chances in the middlegame. Overall, a highly educational encounter! To enable real AI Game Reviews, please configure your GEMINI_API_KEY in server/.env.`;
+    }
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        const prompt = `
+You are an expert chess commentator. Summarize the following chess game PGN in a short, educational, and engaging paragraph (3 to 4 sentences).
+Describe the opening choice, the critical turning point (e.g. key mistake or tactical blow), and how the endgame or final checkmate/resignation played out. Keep it encouraging!
+
+PGN of the game:
+${pgn}
+
+Review summary:
+`;
+
+        const result = await model.generateContent(prompt);
+        return result.response.text().trim();
+    } catch (err: unknown) {
+        console.error("Gemini generateGameReview error:", err);
+        return "The game was fought intensely. Both sides demonstrated strategic ideas, resulting in an exciting battle.";
+    }
+}

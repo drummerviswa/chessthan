@@ -27,6 +27,8 @@ export default function ArchivedGame({ game }: { game: Game }) {
   const [showPgn, setShowPgn] = useState(true);
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [gameReview, setGameReview] = useState<string | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
   const actualGame = new Chess();
   actualGame.loadPgn(game.pgn as string);
 
@@ -37,6 +39,27 @@ export default function ArchivedGame({ game }: { game: Game }) {
   useEffect(() => {
     setAiExplanation(null);
   }, [navIndex]);
+
+  async function getGameReview() {
+    setReviewLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/v1/games/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pgn: game.pgn })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGameReview(data.review);
+      } else {
+        setGameReview("Failed to load Game Review. Please try again.");
+      }
+    } catch (err) {
+      setGameReview("Failed to connect to review server.");
+    } finally {
+      setReviewLoading(false);
+    }
+  }
 
   async function fetchAiExplanation() {
     if (navIndex === null) return;
@@ -446,6 +469,26 @@ export default function ArchivedGame({ game }: { game: Game }) {
               onFocus={(e) => e.target.select()}
             />
           </div>
+        </div>
+
+        {/* Full Game Summary Card */}
+        <div className="card w-full bg-base-300 shadow-sm rounded-lg p-4 border border-base-200 mt-1">
+          <h4 className="font-bold text-xs uppercase tracking-wider text-base-content/50 mb-2 flex items-center gap-1.5">
+            🏆 AI Full Match Review
+          </h4>
+          {gameReview ? (
+            <p className="text-xs leading-relaxed text-base-content/85 animate__animated animate__fadeIn bg-base-100 p-3 rounded border border-base-200">
+              {gameReview}
+            </p>
+          ) : (
+            <button
+              onClick={getGameReview}
+              className={`btn btn-xs btn-outline btn-primary w-full ${reviewLoading ? "loading" : ""}`}
+              disabled={reviewLoading}
+            >
+              Generate AI Match Analysis
+            </button>
+          )}
         </div>
       </div>
     </div>
