@@ -304,7 +304,7 @@ export default function ArchivedGame({ game }: { game: Game }) {
           <div className="flex flex-1 flex-col gap-1">
             {currentOpening && (
               <div className="badge badge-outline border-primary text-primary font-semibold text-xs py-2.5 px-3 rounded w-full justify-center mb-1">
-                📖 {currentOpening}
+                📖 {currentOpening.name}
               </div>
             )}
             <div className="mb-2 flex w-full flex-col items-end gap-1">

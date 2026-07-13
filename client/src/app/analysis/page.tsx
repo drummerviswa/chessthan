@@ -5,6 +5,7 @@ import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { evaluateBoard } from "@/lib/localEngine";
 import { playSound, triggerHaptic } from "@/lib/audioEffects";
+import { getOpeningName } from "@/lib/openingExplorer";
 import { API_URL } from "@/config";
 import {
     IconArrowLeft,
@@ -33,6 +34,9 @@ export default function AnalysisPage() {
     // Evaluation scores
     const [evalScore, setEvalScore] = useState<number>(0);
     
+    // Openings explorer state
+    const [currentOpening, setCurrentOpening] = useState<any>(null);
+
     // Setup inputs
     const [fenInput, setFenInput] = useState<string>("");
     
@@ -73,6 +77,13 @@ export default function AnalysisPage() {
         const scoreVal = evaluateBoard(game);
         setEvalScore(scoreVal / 100);
     }, [gameFen]);
+
+    // Track active opening book name and statistics
+    useEffect(() => {
+        const sanHistory = history.slice(0, navIndex + 1).map(h => h.san);
+        const match = getOpeningName(sanHistory);
+        setCurrentOpening(match);
+    }, [navIndex, history]);
 
     // Setup board from FEN input
     const loadFen = () => {
@@ -404,19 +415,53 @@ export default function AnalysisPage() {
             </div>
 
             {/* Right section: Setup tools & AI Coach */}
-            <div className="w-full max-w-sm flex flex-col gap-6">
+            <div className="w-full max-w-sm flex flex-col justify-between gap-4">
                 
+                {/* Section: Opening Book Explorer */}
+                {currentOpening ? (
+                    <div className="card bg-base-100 border border-base-300 shadow-xl animate__animated animate__fadeIn shrink-0">
+                        <div className="card-body p-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-base-content/40">Opening Book</span>
+                                <span className="badge badge-accent badge-sm font-bold text-[10px] max-w-[200px] truncate">{currentOpening.name}</span>
+                            </div>
+                            
+                            {/* Win-rate bar graph */}
+                            <div className="space-y-1.5">
+                                <div className="flex h-4 w-full rounded-full overflow-hidden text-[9px] font-bold text-center text-white select-none">
+                                    <div className="bg-slate-300 text-slate-800 flex items-center justify-center shrink-0" style={{ width: `${currentOpening.stats.white}%` }}>
+                                        {currentOpening.stats.white}% W
+                                    </div>
+                                    <div className="bg-slate-500 text-slate-100 flex items-center justify-center shrink-0" style={{ width: `${currentOpening.stats.draw}%` }}>
+                                        {currentOpening.stats.draw}% D
+                                    </div>
+                                    <div className="bg-slate-800 text-slate-200 flex items-center justify-center shrink-0" style={{ width: `${currentOpening.stats.black}%` }}>
+                                        {currentOpening.stats.black}% B
+                                    </div>
+                                </div>
+                                <div className="text-[9px] text-base-content/50 font-medium">
+                                    Master stats for: <span className="font-mono text-[8px] bg-base-200 p-0.5 rounded">{currentOpening.moves}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="card bg-base-100 border border-base-300 shadow-xl shrink-0 p-4 text-[10px] text-center text-base-content/30 font-medium">
+                        Play moves on the board to view the Opening Book explorer.
+                    </div>
+                )}
+
                 {/* Setup Tools Card */}
-                <div className="card bg-base-100 border border-base-300 shadow-xl">
-                    <div className="card-body p-5">
-                        <h2 className="card-title text-sm font-bold flex items-center gap-1.5 mb-2">
+                <div className="card bg-base-100 border border-base-300 shadow-xl shrink-0">
+                    <div className="card-body p-4">
+                        <h2 className="card-title text-xs font-bold flex items-center gap-1.5 mb-1">
                             ⚙️ Analysis Tools
                         </h2>
                         
                         {/* FEN Paste Form */}
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             <div>
-                                <label className="label label-text py-0.5 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">
+                                <label className="label label-text py-0.5 text-[9px] font-semibold uppercase tracking-wider text-base-content/50">
                                     Load FEN Position
                                 </label>
                                 <div className="join w-full">
@@ -435,7 +480,7 @@ export default function AnalysisPage() {
 
                             {/* Export PGN */}
                             <div>
-                                <label className="label label-text py-0.5 text-[10px] font-semibold uppercase tracking-wider text-base-content/50">
+                                <label className="label label-text py-0.5 text-[9px] font-semibold uppercase tracking-wider text-base-content/50">
                                     Export PGN
                                 </label>
                                 <button
@@ -449,7 +494,7 @@ export default function AnalysisPage() {
                                 </button>
                             </div>
 
-                            <button onClick={resetAnalysis} className="btn btn-outline btn-xs w-full mt-2 text-error hover:bg-error/20 hover:text-error">
+                            <button onClick={resetAnalysis} className="btn btn-outline btn-xs w-full text-error hover:bg-error/20 hover:text-error py-0.5 h-6 min-h-6">
                                 🔄 Clear Board
                             </button>
                         </div>
@@ -458,17 +503,17 @@ export default function AnalysisPage() {
 
                 {/* AI Coach Assistant Card */}
                 <div className="card bg-base-100 border border-base-300 shadow-xl flex-1">
-                    <div className="card-body p-5 flex flex-col">
-                        <h2 className="card-title text-sm font-bold flex items-center gap-1.5 mb-2">
+                    <div className="card-body p-4 flex flex-col justify-between">
+                        <h2 className="card-title text-xs font-bold flex items-center gap-1.5 mb-1">
                             👨‍🏫 AI Analysis Coach
                         </h2>
                         
-                        <div className="text-[10px] text-base-content/60 mb-4">
-                            Move pieces on the board, then click the button below to request a detailed strategic breakdown of the position.
+                        <div className="text-[10px] text-base-content/60 mb-2 leading-tight">
+                            Move pieces, then request strategic breakdowns of the position.
                         </div>
 
                         {/* Explanation viewport */}
-                        <div className="flex-1 h-44 overflow-y-auto bg-base-200 border border-base-300 rounded-xl p-3 text-[11px] font-medium leading-relaxed mb-4">
+                        <div className="flex-1 h-32 overflow-y-auto bg-base-200 border border-base-300 rounded-xl p-3 text-[11px] font-medium leading-relaxed mb-3">
                             {aiLoading ? (
                                 <div className="flex flex-col items-center justify-center h-full gap-2">
                                     <span className="loading loading-spinner loading-sm text-primary"></span>
@@ -481,7 +526,7 @@ export default function AnalysisPage() {
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-full text-base-content/30 text-center px-4">
-                                    <IconInfoCircle size={28} className="mb-1" />
+                                    <IconInfoCircle size={22} className="mb-1" />
                                     <span>Make a move and click &apos;Explain Position&apos; to receive coach insights.</span>
                                 </div>
                             )}
@@ -489,7 +534,7 @@ export default function AnalysisPage() {
 
                         <button
                             onClick={explainActivePosition}
-                            className="btn btn-primary btn-sm w-full font-bold"
+                            className="btn btn-primary btn-xs w-full font-bold h-7 min-h-7"
                             disabled={history.length === 0 || aiLoading}
                         >
                             💡 Explain Position
