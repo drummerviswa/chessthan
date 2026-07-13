@@ -1,5 +1,7 @@
 // import { nanoid } from "nanoid";
 import GameModel, { activeGames } from "../db/models/game.model.js";
+import { generateThematicRoomCode } from "../utils/wordGenerator.js";
+import { explainMove } from "../lib/aiCoach.js";
 export const getGames = async (req, res) => {
     try {
         if (!req.query.id && !req.query.userid) {
@@ -62,17 +64,6 @@ export const getActiveGame = async (req, res) => {
         res.status(500).end();
     }
 };
-async function generateRandomWord() {
-    try {
-        const response = await fetch("https://random-word-api.herokuapp.com/word");
-        const data = await response.json();
-        return data[0]; // API returns an array with a single word
-    }
-    catch (error) {
-        console.error("Error fetching random word:", error);
-        return "defaultword"; // Fallback in case of error
-    }
-}
 export const createGame = async (req, res) => {
     try {
         if (!req.session.user?.id) {
@@ -86,9 +77,12 @@ export const createGame = async (req, res) => {
             connected: false
         };
         const unlisted = req.body.unlisted ?? false;
+        let code = generateThematicRoomCode();
+        while (activeGames.some((g) => g.code === code)) {
+            code = generateThematicRoomCode();
+        }
         const game = {
-            // code: nanoid(6),
-            code: await generateRandomWord(),
+            code,
             unlisted,
             host: user,
             pgn: ""
@@ -114,5 +108,20 @@ export const createGame = async (req, res) => {
     catch (err) {
         console.log(err);
         res.status(500).end();
+    }
+};
+export const explainActiveMove = async (req, res) => {
+    try {
+        const { fenBefore, fenAfter, move, bestMove } = req.body;
+        if (!fenBefore || !fenAfter || !move) {
+            res.status(400).json({ message: "fenBefore, fenAfter, and move are required" });
+            return;
+        }
+        const explanation = await explainMove(fenBefore, fenAfter, move, bestMove);
+        res.status(200).json({ explanation });
+    }
+    catch (err) {
+        console.error("explainActiveMove controller error:", err);
+        res.status(500).json({ message: "Internal server error" });
     }
 };

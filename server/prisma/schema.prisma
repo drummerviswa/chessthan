@@ -1,0 +1,95 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String   @unique @db.VarChar(128)
+  email         String?  @unique @db.VarChar(128)
+  password      String?
+  wins          Int      @default(0)
+  losses        Int      @default(0)
+  draws         Int      @default(0)
+  eloBullet     Int      @default(1200) @map("elo_bullet")
+  eloBlitz      Int      @default(1200) @map("elo_blitz")
+  eloRapid      Int      @default(1200) @map("elo_rapid")
+  eloClassical  Int      @default(1200) @map("elo_classical")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  avatarUrl     String?  @map("avatar_url") @db.Text
+  puzzleRating  Int      @default(1200) @map("puzzle_rating")
+  division      String   @default("Bronze") @db.VarChar(32)
+  xp            Int      @default(0)
+
+  // Razorpay Billing
+  subscriptionId      String? @map("subscription_id") @db.VarChar(128)
+  subscriptionStatus  String? @map("subscription_status") @db.VarChar(32) // "active", "cancelled", "expired"
+  razorpayCustomerId  String? @map("razorpay_customer_id") @db.VarChar(128)
+
+  whiteGames    Game[]   @relation("WhitePlayer")
+  blackGames    Game[]   @relation("BlackPlayer")
+  eloHistory    EloHistory[]
+  puzzleHistory UserPuzzleHistory[]
+
+  @@map("user")
+}
+
+model Game {
+  id          Int      @id @default(autoincrement())
+  winner      String?  @db.VarChar(5) // "white", "black", "draw"
+  endReason   String?  @map("end_reason") @db.VarChar(16)
+  pgn         String?  @db.Text
+  whiteId     Int?     @map("white_id")
+  whiteName   String?  @map("white_name") @db.VarChar(32)
+  blackId     Int?     @map("black_id")
+  blackName   String?  @map("black_name") @db.VarChar(32)
+  startedAt   DateTime @map("started_at")
+  endedAt     DateTime @default(now()) @map("ended_at")
+
+  whitePlayer User?    @relation("WhitePlayer", fields: [whiteId], references: [id])
+  blackPlayer User?    @relation("BlackPlayer", fields: [blackId], references: [id])
+
+  @@map("game")
+}
+
+model EloHistory {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  gameType   String   @map("game_type") @db.VarChar(16) // "bullet", "blitz", "rapid", "classical"
+  elo        Int
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("elo_history")
+}
+
+model Puzzle {
+  id        String   @id @default(uuid()) @db.VarChar(128)
+  fen       String   @db.Text
+  moves     String   @db.Text // Comma separated list of moves, e.g. "e2e4,e7e5"
+  rating    Int
+  theme     String?  @db.VarChar(64)
+
+  userHistory UserPuzzleHistory[]
+
+  @@map("puzzle")
+}
+
+model UserPuzzleHistory {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  puzzleId   String   @map("puzzle_id") @db.VarChar(128)
+  solved     Boolean
+  solvedAt   DateTime @default(now()) @map("solved_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  puzzle     Puzzle   @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+
+  @@map("user_puzzle_history")
+}

@@ -14,6 +14,8 @@ import type { Square } from "chess.js";
 import { Chess } from "chess.js";
 import { useEffect, useReducer, useRef, useState } from "react";
 import { Chessboard } from "react-chessboard";
+import { API_URL } from "@/config";
+import { getOpeningName } from "@/lib/openingExplorer";
 
 export default function ArchivedGame({ game }: { game: Game }) {
   const [boardWidth, setBoardWidth] = useState(480);
@@ -23,8 +25,55 @@ export default function ArchivedGame({ game }: { game: Game }) {
   const [flipBoard, setFlipBoard] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showPgn, setShowPgn] = useState(true);
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const actualGame = new Chess();
   actualGame.loadPgn(game.pgn as string);
+
+  const history = actualGame.history({ verbose: true });
+  const movesPlayed = history.slice(0, navIndex === null ? history.length : navIndex + 1).map(m => m.san);
+  const currentOpening = getOpeningName(movesPlayed);
+
+  useEffect(() => {
+    setAiExplanation(null);
+  }, [navIndex]);
+
+  async function fetchAiExplanation() {
+    if (navIndex === null) return;
+    const history = actualGame.history({ verbose: true });
+    const currentMove = history[navIndex];
+
+    setAiLoading(true);
+    setAiExplanation(null);
+
+    const { getBestMove } = await import("@/lib/localEngine");
+    const bestMove = getBestMove(currentMove.before, 2);
+
+    try {
+      const res = await fetch(`${API_URL}/v1/games/explain`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fenBefore: currentMove.before,
+          fenAfter: currentMove.after,
+          move: currentMove.san,
+          bestMove: bestMove || undefined
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAiExplanation(data.explanation);
+      } else {
+        setAiExplanation("Failed to load explanation from AI. Please try again.");
+      }
+    } catch (e) {
+      console.error(e);
+      setAiExplanation("Network error. Could not connect to AI Tutor.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   const [customSquares, updateCustomSquares] = useReducer(
     (squares: CustomSquares, action: Partial<CustomSquares>) => {
@@ -253,6 +302,11 @@ export default function ArchivedGame({ game }: { game: Game }) {
           </div>
 
           <div className="flex flex-1 flex-col gap-1">
+            {currentOpening && (
+              <div className="badge badge-outline border-primary text-primary font-semibold text-xs py-2.5 px-3 rounded w-full justify-center mb-1">
+                📖 {currentOpening}
+              </div>
+            )}
             <div className="mb-2 flex w-full flex-col items-end gap-1">
               Archived link:
               <div
@@ -315,6 +369,42 @@ export default function ArchivedGame({ game }: { game: Game }) {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* AI Tutor Panel */}
+        <div className="card w-full bg-base-300 shadow-sm rounded-lg p-4 border border-base-200">
+          <h3 className="font-bold text-sm mb-2 flex items-center gap-2">
+            🤖 Chessthan AI Tutor
+          </h3>
+          {navIndex === null ? (
+            <p className="text-xs text-base-content/60">
+              Select any move from the list above to get an AI coach explanation.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-xs flex justify-between items-center">
+                <span>
+                  Selected Move: <span className="font-bold text-primary">{actualGame.history({ verbose: true })[navIndex].san}</span>
+                </span>
+                <span className="text-[10px] text-base-content/50">
+                  {actualGame.history({ verbose: true })[navIndex].color === "w" ? "White's turn" : "Black's turn"}
+                </span>
+              </div>
+              {aiExplanation ? (
+                <div className="p-3 bg-base-100 rounded border border-base-200 text-xs leading-relaxed text-base-content animate__animated animate__fadeIn">
+                  {aiExplanation}
+                </div>
+              ) : (
+                <button
+                  onClick={fetchAiExplanation}
+                  className={`btn btn-xs btn-primary w-full ${aiLoading ? "loading" : ""}`}
+                  disabled={aiLoading}
+                >
+                  Explain Move with AI
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="relative h-60 w-full min-w-fit">

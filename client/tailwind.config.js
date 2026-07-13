@@ -11,34 +11,35 @@ module.exports = {
     plugins: [require("daisyui")],
     darkMode: ["class", '[data-theme="chessuDark"]'],
     daisyui: {
-        // based on daisyUI night and winter themes
         themes: [
             {
                 chessuLight: {
-                    primary: "#047AFF",
-                    secondary: "#9dc4e1",
-                    accent: "#C148AC",
-                    neutral: "#9dc4d1",
-                    "base-100": "#FFFFFF",
-                    "base-200": "#F2F7FF",
-                    "base-300": "#E3E9F4",
-                    "base-content": "#1E293B",
-                    info: "#93E7FB",
-                    success: "#81CFD1",
-                    warning: "#EFD7BB",
-                    error: "#E58B8B"
+                    primary: "#0070F3",
+                    secondary: "#3B82F6",
+                    accent: "#F59E0B",
+                    neutral: "#334155",
+                    "base-100": "#F8FAFC",
+                    "base-200": "#F1F5F9",
+                    "base-300": "#E2E8F0",
+                    "base-content": "#0F172A",
+                    info: "#06B6D4",
+                    success: "#10B981",
+                    warning: "#F59E0B",
+                    error: "#EF4444"
                 },
                 chessuDark: {
-                    primary: "#38BDF8",
-                    secondary: "#9dc4d1",
-                    accent: "#1d4ed8",
-                    neutral: "#1E293B",
-                    "base-100": "#191923",
-                    "base-content": "#9dc4d1",
-                    info: "#0CA5E9",
-                    success: "#2DD4BF",
-                    warning: "#F4BF50",
-                    error: "#FB7085"
+                    primary: "#3B82F6",
+                    secondary: "#60A5FA",
+                    accent: "#F59E0B",
+                    neutral: "#334155",
+                    "base-100": "#0F172A",
+                    "base-200": "#1E293B",
+                    "base-300": "#334155",
+                    "base-content": "#F1F5F9",
+                    info: "#06B6D4",
+                    success: "#10B981",
+                    warning: "#F59E0B",
+                    error: "#EF4444"
                 }
             }
         ],

@@ -29,7 +29,15 @@ export default function JoinGame() {
       code = "http://" + code;
     }
     if (code.startsWith("http")) {
-      code = new URL(code).pathname.split("/")[1];
+      try {
+        const url = new URL(code);
+        const parts = url.pathname.split("/").filter(Boolean);
+        if (parts.length > 0) {
+          code = parts[parts.length - 1];
+        }
+      } catch (err) {
+        console.error("Invalid URL entered:", err);
+      }
     }
 
     const game = await fetchActiveGame(code);

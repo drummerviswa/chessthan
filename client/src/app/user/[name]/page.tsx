@@ -1,6 +1,8 @@
 import CopyLink from "@/components/user/CopyLink";
 import { fetchProfileData } from "@/lib/user";
 import { notFound } from "next/navigation";
+import EloProgressGraph from "@/components/user/EloProgressGraph";
+import StatsDashboard from "@/components/user/StatsDashboard";
 
 export async function generateMetadata({ params }: { params: { name: string } }) {
   const data = await fetchProfileData(params.name);
@@ -60,6 +62,18 @@ export default async function Profile({ params }: { params: { name: string } }) 
         </div>
         <CopyLink name={data.name as string} />
       </div>
+
+      {/* ELO Rating Progression Line Graph */}
+      <EloProgressGraph eloHistory={(data as any).eloHistory || []} />
+
+      {/* Recharts Performance Stats Dashboard */}
+      <StatsDashboard
+        recentGames={data.recentGames}
+        userName={data.name as string}
+        wins={data.wins as number}
+        losses={data.losses as number}
+        draws={data.draws as number}
+      />
 
       <div>
         <h2 className="mb-1 text-lg font-bold">Recent games</h2>

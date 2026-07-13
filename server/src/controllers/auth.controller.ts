@@ -5,7 +5,11 @@ import xss from "xss";
 
 import { activeGames } from "../db/models/game.model.js";
 import UserModel from "../db/models/user.model.js";
+import { prisma } from "../db/index.js";
 import { io } from "../server.js";
+import { sendEmail } from "../utils/smtp.js";
+import redisClient from "../lib/redis.js";
+import { nanoid } from "nanoid";
 
 export const getCurrentSession = async (req: Request, res: Response) => {
     try {
@@ -313,5 +317,144 @@ export const updateUser = async (req: Request, res: Response) => {
     } catch (err: unknown) {
         console.log(err);
         res.status(500).end();
+    }
+};
+
+export const oauthSession = async (req: Request, res: Response) => {
+    try {
+        const name = xss(req.body.name || "");
+        const email = xss(req.body.email || "");
+        const avatarUrl = xss(req.body.avatarUrl || "");
+
+        if (!email) {
+            res.status(400).json({ message: "Email is required for OAuth login." });
+            return;
+        }
+
+        // Try to find user by email
+        let dbUser = await prisma.user.findUnique({
+            where: { email }
+        });
+
+        if (!dbUser) {
+            // Check if name is unique
+            let baseName = name.replace(/[^A-Za-z0-9]/g, "") || "ChessPlayer";
+            let uniqueName = baseName;
+            let counter = 1;
+
+            while (await prisma.user.findUnique({ where: { name: uniqueName } })) {
+                uniqueName = `${baseName}${counter}`;
+                counter++;
+            }
+
+            // Create new OAuth user
+            dbUser = await prisma.user.create({
+                data: {
+                    name: uniqueName,
+                    email,
+                    avatarUrl
+                }
+            });
+        } else if (avatarUrl && dbUser.avatarUrl !== avatarUrl) {
+            // Update avatar if changed
+            dbUser = await prisma.user.update({
+                where: { id: dbUser.id },
+                data: { avatarUrl }
+            });
+        }
+
+        res.status(200).json({
+            id: dbUser.id,
+            name: dbUser.name,
+            email: dbUser.email || undefined,
+            wins: dbUser.wins,
+            losses: dbUser.losses,
+            draws: dbUser.draws,
+            avatarUrl: dbUser.avatarUrl || undefined,
+            subscriptionStatus: dbUser.subscriptionStatus || undefined,
+            puzzleRating: dbUser.puzzleRating
+        });
+    } catch (err: unknown) {
+        console.error("oauthSession error:", err);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+    try {
+        const email = xss(req.body.email || "");
+
+        if (!email) {
+            res.status(400).json({ message: "Email is required." });
+            return;
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { email }
+        });
+
+        if (!user) {
+            // Return 200 even if email not found to prevent user enumeration attacks
+            res.status(200).json({ message: "If an account with that email exists, a password reset link has been sent." });
+            return;
+        }
+
+        // Generate reset token
+        const resetToken = nanoid(32);
+        
+        // Save token in Redis with 15 minutes TTL (900 seconds)
+        await redisClient.set(`reset_token:${resetToken}`, String(user.id), "EX", 900);
+
+        const resetUrl = `${process.env.CORS_ORIGIN || "http://localhost:3000"}/auth/reset-password?token=${resetToken}`;
+
+        const emailContent = `
+        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+            <h2>Reset your Chessthan Password</h2>
+            <p>You requested a password reset. Click the button below to set a new password. This link is valid for 15 minutes.</p>
+            <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #0070f3; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">Reset Password</a>
+            <p style="margin-top: 20px; font-size: 12px; color: #666;">If you didn't request this, you can ignore this email.</p>
+        </div>
+        `;
+
+        await sendEmail(email, "Reset your Chessthan password", emailContent);
+
+        res.status(200).json({ message: "If an account with that email exists, a password reset link has been sent." });
+    } catch (err: unknown) {
+        console.error("forgotPassword error:", err);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+    try {
+        const token = xss(req.body.token || "");
+        const password = req.body.password;
+
+        if (!token || !password) {
+            res.status(400).json({ message: "Token and password are required." });
+            return;
+        }
+
+        const userIdStr = await redisClient.get(`reset_token:${token}`);
+        if (!userIdStr) {
+            res.status(400).json({ message: "Invalid or expired reset token." });
+            return;
+        }
+
+        const userId = parseInt(userIdStr);
+        const hashedPassword = await hash(password);
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: { password: hashedPassword }
+        });
+
+        // Delete the token
+        await redisClient.del(`reset_token:${token}`);
+
+        res.status(200).json({ message: "Password reset successful. You can now log in." });
+    } catch (err: unknown) {
+        console.error("resetPassword error:", err);
+        res.status(500).json({ message: "Internal server error" });
     }
 };

@@ -32,6 +32,8 @@ import { initSocket } from "./socketEvents";
 import { syncPgn, syncSide } from "./utils";
 import "animate.css";
 import Lottie from "lottie-react";
+import { playSound, triggerHaptic } from "@/lib/audioEffects";
+import GameResultModal from "./GameResultModal";
 
 const socket = io(API_URL, { withCredentials: true, autoConnect: false });
 
@@ -60,12 +62,22 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
 
   const [playBtnLoading, setPlayBtnLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
+
   const [chatMessages, setChatMessages] = useState<Message[]>([
     {
       author: {},
       message: `Have fun by invite your friends to spectate your spectacular game!`,
     },
   ]);
+
+  // Open result modal on game completion
+  useEffect(() => {
+    if (lobby.winner || lobby.endReason) {
+      setShowResultModal(true);
+    }
+  }, [lobby.winner, lobby.endReason]);
+
   const chatListRef = useRef<HTMLUListElement>(null);
   const moveListRef = useRef<HTMLDivElement>(null);
 
@@ -220,6 +232,18 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
       const result = lobby.actualGame.move(m);
 
       if (result) {
+        // Trigger sounds & haptics on move play
+        if (result.captured) {
+          playSound("capture");
+          triggerHaptic("capture");
+        } else if (lobby.actualGame.inCheck()) {
+          playSound("check");
+          triggerHaptic("check");
+        } else {
+          playSound("move");
+          triggerHaptic("move");
+        }
+
         setNavFen(null);
         setNavIndex(null);
         updateLobby({
@@ -243,15 +267,15 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
           kingSquare = {
             [kingPos]: {
               background:
-                "radial-gradient(red, rgba(255,0,0,.4), transparent 70%)",
-              borderRadius: "50%",
-            },
+                "radial-gradient(circle, rgba(239, 68, 68, 0.6) 100%, transparent 100%)",
+              boxShadow: "inset 0 0 16px #ef4444"
+            } as any,
           };
         }
         updateCustomSquares({
           lastMove: {
-            [result.from]: { background: "rgba(255, 255, 0, 0.4)" },
-            [result.to]: { background: "rgba(255, 255, 0, 0.4)" },
+            [result.from]: { background: "rgba(255, 255, 0, 0.3)" },
+            [result.to]: { background: "rgba(255, 255, 0, 0.3)" },
           },
           options: {},
           check: kingSquare,
@@ -303,20 +327,19 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     const newSquares: {
       [square: string]: { background: string; borderRadius?: string };
     } = {};
-    moves.map((move) => {
+    moves.forEach((move) => {
       newSquares[move.to] = {
         background:
           lobby.actualGame.get(move.to as Square) &&
           lobby.actualGame.get(move.to as Square)?.color !==
             lobby.actualGame.get(square)?.color
-            ? "radial-gradient(circle, rgba(0,0,0,.1) 85%, transparent 85%)"
-            : "radial-gradient(circle, rgba(0,0,0,.1) 25%, transparent 25%)",
+            ? "radial-gradient(circle, rgba(239, 68, 68, 0.4) 80%, transparent 80%)"
+            : "radial-gradient(circle, rgba(0, 0, 0, 0.25) 25%, transparent 25%)",
         borderRadius: "50%",
       };
-      return move;
     });
     newSquares[square] = {
-      background: "rgba(255, 255, 0, 0.4)",
+      background: "rgba(255, 255, 0, 0.3)",
     };
     updateCustomSquares({ options: newSquares });
   }
@@ -857,6 +880,13 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
           )}
         </div>
       </div>
+      <GameResultModal
+        isOpen={showResultModal}
+        onClose={() => setShowResultModal(false)}
+        winner={lobby.winner as any}
+        playerColor={lobby.side === "w" ? "white" : lobby.side === "b" ? "black" : "observer"}
+        reason={lobby.endReason || "agreement"}
+      />
     </div>
   );
 }

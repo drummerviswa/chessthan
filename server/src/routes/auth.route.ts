@@ -13,5 +13,8 @@ router.route("/logout").post(controller.logoutSession);
 
 router.route("/register").post(controller.registerUser);
 router.route("/login").post(controller.loginUser);
+router.route("/oauth").post(controller.oauthSession);
+router.route("/forgot-password").post(controller.forgotPassword);
+router.route("/reset-password").post(controller.resetPassword);
 
 export default router;

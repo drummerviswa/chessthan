@@ -2,8 +2,9 @@ import "@/styles/globals.css";
 
 import type { ReactNode } from "react";
 
-import Header from "@/components/Header";
+import Sidebar from "@/components/Sidebar";
 import AuthModal from "@/components/auth/AuthModal";
+import UpgradeModal from "@/components/user/UpgradeModal";
 
 import ContextProvider from "@/context/ContextProvider";
 
@@ -38,15 +39,22 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="overflow-x-hidden">
-      <body className="overflow-x-hidden">
+      <body className="overflow-x-hidden bg-base-100 text-base-content min-h-screen">
         <ContextProvider>
-          <Header />
+          <div className="flex min-h-screen bg-base-100 text-base-content">
+            {/* Left Sidebar on Desktop / Bottom Tabbar on Mobile */}
+            <Sidebar />
 
-          <main className="mx-16 flex py-12 min-h-[70vh] justify-center md:mx-20 lg:mx-48">
-            {children}
-          </main>
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col min-w-0 md:pl-16 pb-16 md:pb-0">
+              <main className="flex-grow p-4 md:p-8 flex items-center justify-center min-h-[90vh]">
+                {children}
+              </main>
+            </div>
+          </div>
 
           <AuthModal />
+          <UpgradeModal />
         </ContextProvider>
         <script
           id="load-theme"

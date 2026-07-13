@@ -141,6 +141,14 @@ export async function claimAbandoned(this: Socket, type: "win" | "draw") {
     const { id } = (await GameModel.save(game)) as Game;
     game.id = id;
 
+    // Check if it is a tournament game
+    if ((game as any).tournamentId) {
+        const winnerId = game.winner === "draw" ? null : ((game.winner === "white" ? game.white?.id : game.black?.id) ?? null);
+        import("../lib/tournamentManager.js").then(({ registerMatchResult }) => {
+            registerMatchResult((game as any).tournamentId, game.code as string, winnerId, game.winner === "draw");
+        }).catch(err => console.error("Claim abandoned tournament register failed:", err));
+    }
+
     const gameOver = {
         reason: game.endReason,
         winnerName: this.request.session.user.name,
@@ -208,6 +216,15 @@ export async function sendMove(this: Socket, m: { from: string; to: string; prom
 
                 const { id } = (await GameModel.save(game)) as Game; // save game to db
                 game.id = id;
+
+                // Check if it is a tournament game
+                if ((game as any).tournamentId) {
+                    const winnerId = game.winner === "draw" ? null : ((game.winner === "white" ? game.white?.id : game.black?.id) ?? null);
+                    import("../lib/tournamentManager.js").then(({ registerMatchResult }) => {
+                        registerMatchResult((game as any).tournamentId, game.code as string, winnerId, game.winner === "draw");
+                    }).catch(err => console.error("Send move tournament register failed:", err));
+                }
+
                 io.to(game.code as string).emit("gameOver", { reason, winnerName, winnerSide, id });
 
                 if (game.timeout) clearTimeout(game.timeout);

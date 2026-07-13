@@ -1,69 +1,146 @@
-import { db } from "../index.js";
+import { prisma } from "../index.js";
 export const activeGames = [];
 export const save = async (game) => {
     try {
         const white = {};
         const black = {};
-        if (typeof game.white?.id === "string") {
-            white.name = game.white?.name;
-        }
-        else {
-            white.id = game.white?.id;
-        }
-        if (typeof game.black?.id === "string") {
-            black.name = game.black?.name;
-        }
-        else {
-            black.id = game.black?.id;
-        }
-        const res = await db.query(`INSERT INTO "game"(winner, end_reason, pgn, white_id, white_name, black_id, black_name, started_at) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`, [
-            game.winner || null,
-            game.endReason || null,
-            game.pgn,
-            white.id || null,
-            white.name || null,
-            black.id || null,
-            black.name || null,
-            new Date(game.startedAt)
-        ]);
-        if (black.id || white.id) {
-            // draws
-            if (game.winner === "draw") {
-                if (white.id) {
-                    await db.query(`UPDATE "user" SET draws = draws + 1 WHERE id = $1`, [white.id]);
-                }
-                if (black.id) {
-                    await db.query(`UPDATE "user" SET draws = draws + 1 WHERE id = $1`, [black.id]);
-                }
+        if (game.white) {
+            if (typeof game.white.id === "number") {
+                white.id = game.white.id;
             }
             else {
-                const winner = game.winner === "white" ? white : black;
-                const loser = game.winner === "white" ? black : white;
-                if (winner.id) {
-                    await db.query(`UPDATE "user" SET wins = wins + 1 WHERE id = $1`, [winner.id]);
-                }
-                if (loser.id) {
-                    await db.query(`UPDATE "user" SET losses = losses + 1 WHERE id = $1`, [
-                        loser.id
-                    ]);
-                }
+                white.name = game.white.name || undefined;
+            }
+        }
+        if (game.black) {
+            if (typeof game.black.id === "number") {
+                black.id = game.black.id;
+            }
+            else {
+                black.name = game.black.name || undefined;
+            }
+        }
+        const newGame = await prisma.game.create({
+            data: {
+                winner: game.winner || null,
+                endReason: game.endReason || null,
+                pgn: game.pgn || null,
+                whiteId: white.id || null,
+                whiteName: game.white?.name || null,
+                blackId: black.id || null,
+                blackName: game.black?.name || null,
+                startedAt: new Date(game.startedAt)
+            }
+        });
+        // Update player stats if registered users
+        if (white.id || black.id) {
+            // Determine game pool based on timeout
+            const gameType = game.timeout
+                ? (game.timeout <= 180 ? "bullet" : (game.timeout <= 600 ? "blitz" : (game.timeout <= 1800 ? "rapid" : "classical")))
+                : "blitz";
+            const eloFieldMap = {
+                bullet: "eloBullet",
+                blitz: "eloBlitz",
+                rapid: "eloRapid",
+                classical: "eloClassical"
+            };
+            const eloField = eloFieldMap[gameType];
+            // Fetch current ratings
+            let whiteElo = 1200;
+            let blackElo = 1200;
+            if (white.id) {
+                const wUser = await prisma.user.findUnique({ where: { id: white.id } });
+                if (wUser)
+                    whiteElo = wUser[eloField];
+            }
+            if (black.id) {
+                const bUser = await prisma.user.findUnique({ where: { id: black.id } });
+                if (bUser)
+                    blackElo = bUser[eloField];
+            }
+            // Expectation scores
+            const Ew = 1 / (1 + Math.pow(10, (blackElo - whiteElo) / 400));
+            const Eb = 1 / (1 + Math.pow(10, (whiteElo - blackElo) / 400));
+            // Actual scores
+            let Sw = 0.5;
+            let Sb = 0.5;
+            if (game.winner === "white") {
+                Sw = 1;
+                Sb = 0;
+            }
+            else if (game.winner === "black") {
+                Sw = 0;
+                Sb = 1;
+            }
+            // ELO deltas
+            const deltaW = Math.round(32 * (Sw - Ew));
+            const deltaB = Math.round(32 * (Sb - Eb));
+            // 1. Update White Player
+            if (white.id) {
+                const isDraw = game.winner === "draw";
+                const isWin = game.winner === "white";
+                const newElo = Math.max(100, whiteElo + deltaW);
+                await prisma.user.update({
+                    where: { id: white.id },
+                    data: {
+                        draws: isDraw ? { increment: 1 } : undefined,
+                        wins: isWin ? { increment: 1 } : undefined,
+                        losses: (!isDraw && !isWin) ? { increment: 1 } : undefined,
+                        [eloField]: newElo,
+                        xp: {
+                            increment: isWin ? 30 : (isDraw ? 15 : 10)
+                        }
+                    }
+                });
+                await prisma.eloHistory.create({
+                    data: {
+                        userId: white.id,
+                        gameType,
+                        elo: newElo
+                    }
+                });
+            }
+            // 2. Update Black Player
+            if (black.id) {
+                const isDraw = game.winner === "draw";
+                const isWin = game.winner === "black";
+                const newElo = Math.max(100, blackElo + deltaB);
+                await prisma.user.update({
+                    where: { id: black.id },
+                    data: {
+                        draws: isDraw ? { increment: 1 } : undefined,
+                        wins: isWin ? { increment: 1 } : undefined,
+                        losses: (!isDraw && !isWin) ? { increment: 1 } : undefined,
+                        [eloField]: newElo,
+                        xp: {
+                            increment: isWin ? 30 : (isDraw ? 15 : 10)
+                        }
+                    }
+                });
+                await prisma.eloHistory.create({
+                    data: {
+                        userId: black.id,
+                        gameType,
+                        elo: newElo
+                    }
+                });
             }
         }
         return {
-            id: res.rows[0].id,
-            winner: res.rows[0].winner,
-            endReason: res.rows[0].reason,
-            pgn: res.rows[0].pgn,
+            id: newGame.id,
+            winner: newGame.winner || undefined,
+            endReason: newGame.endReason || undefined,
+            pgn: newGame.pgn || undefined,
             white: {
-                id: res.rows[0].white_id || undefined,
-                name: res.rows[0].white_name || undefined
+                id: newGame.whiteId || undefined,
+                name: newGame.whiteName || undefined
             },
             black: {
-                id: res.rows[0].black_id || undefined,
-                name: res.rows[0].black_name || undefined
+                id: newGame.blackId || undefined,
+                name: newGame.blackName || undefined
             },
-            startedAt: res.rows[0].started_at.getTime(),
-            endedAt: res.rows[0].ended_at?.getTime() || undefined
+            startedAt: newGame.startedAt.getTime(),
+            endedAt: newGame.endedAt?.getTime() || undefined
         };
     }
     catch (err) {
@@ -73,17 +150,29 @@ export const save = async (game) => {
 };
 export const findById = async (id) => {
     try {
-        const res = await db.query(`SELECT game.id, game.winner, game.end_reason, game.pgn, white_user.id AS white_id, COALESCE(white_user.name, game.white_name) AS white_name, black_user.id AS black_id, started_at, ended_at, COALESCE(black_user.name, game.black_name) AS black_name FROM game LEFT JOIN "user" white_user ON white_user.id = game.white_id LEFT JOIN "user" black_user ON black_user.id = game.black_id WHERE game.id=$1`, [id]);
-        if (res.rowCount) {
+        const game = await prisma.game.findUnique({
+            where: { id },
+            include: {
+                whitePlayer: true,
+                blackPlayer: true
+            }
+        });
+        if (game) {
             return {
-                id: res.rows[0].id,
-                winner: res.rows[0].winner,
-                endReason: res.rows[0].end_reason,
-                pgn: res.rows[0].pgn,
-                white: { id: res.rows[0].white_id || undefined, name: res.rows[0].white_name },
-                black: { id: res.rows[0].black_id || undefined, name: res.rows[0].black_name },
-                startedAt: res.rows[0].started_at.getTime(),
-                endedAt: res.rows[0].ended_at?.getTime() || undefined
+                id: game.id,
+                winner: game.winner || undefined,
+                endReason: game.endReason || undefined,
+                pgn: game.pgn || undefined,
+                white: {
+                    id: game.whiteId || undefined,
+                    name: game.whitePlayer?.name || game.whiteName || undefined
+                },
+                black: {
+                    id: game.blackId || undefined,
+                    name: game.blackPlayer?.name || game.blackName || undefined
+                },
+                startedAt: game.startedAt.getTime(),
+                endedAt: game.endedAt?.getTime() || undefined
             };
         }
         else
@@ -95,22 +184,42 @@ export const findById = async (id) => {
     }
 };
 export const findByUserId = async (id, limit = 10) => {
-    if (id == 0) {
+    if (id === 0) {
         return null;
     }
     try {
-        // TODO: pagination
-        const res = await db.query(`SELECT game.id, game.winner, game.end_reason, game.pgn, white_user.id AS white_id, COALESCE(white_user.name, game.white_name) AS white_name, black_user.id AS black_id, started_at, ended_at, COALESCE(black_user.name, game.black_name) AS black_name FROM game LEFT JOIN "user" white_user ON white_user.id = game.white_id LEFT JOIN "user" black_user ON black_user.id = game.black_id WHERE white_user.id=$1 OR black_user.id=$1 ORDER BY id DESC LIMIT $2`, [id, limit]);
-        return res.rows.map((r) => {
+        const games = await prisma.game.findMany({
+            where: {
+                OR: [
+                    { whiteId: id },
+                    { blackId: id }
+                ]
+            },
+            include: {
+                whitePlayer: true,
+                blackPlayer: true
+            },
+            orderBy: {
+                id: "desc"
+            },
+            take: limit
+        });
+        return games.map((game) => {
             return {
-                id: r.id,
-                winner: r.winner,
-                endReason: r.end_reason,
-                pgn: r.pgn,
-                white: { id: r.white_id || undefined, name: r.white_name },
-                black: { id: r.black_id || undefined, name: r.black_name },
-                startedAt: r.started_at.getTime(),
-                endedAt: r.ended_at?.getTime() || undefined
+                id: game.id,
+                winner: game.winner || undefined,
+                endReason: game.endReason || undefined,
+                pgn: game.pgn || undefined,
+                white: {
+                    id: game.whiteId || undefined,
+                    name: game.whitePlayer?.name || game.whiteName || undefined
+                },
+                black: {
+                    id: game.blackId || undefined,
+                    name: game.blackPlayer?.name || game.blackName || undefined
+                },
+                startedAt: game.startedAt.getTime(),
+                endedAt: game.endedAt?.getTime() || undefined
             };
         });
     }
@@ -121,16 +230,18 @@ export const findByUserId = async (id, limit = 10) => {
 };
 export const remove = async (id) => {
     try {
-        const res = await db.query(`DELETE FROM "game" WHERE id = $1 RETURNING *`, [id]);
+        const deleted = await prisma.game.delete({
+            where: { id }
+        });
         return {
-            id: res.rows[0].id,
-            winner: res.rows[0].winner,
-            endReason: res.rows[0].end_reason,
-            pgn: res.rows[0].pgn,
-            white: { id: res.rows[0].white_id, name: res.rows[0].white_name },
-            black: { id: res.rows[0].black_id, name: res.rows[0].black_name },
-            startedAt: res.rows[0].started_at.getTime(),
-            endedAt: res.rows[0].ended_at?.getTime() || undefined
+            id: deleted.id,
+            winner: deleted.winner || undefined,
+            endReason: deleted.endReason || undefined,
+            pgn: deleted.pgn || undefined,
+            white: { id: deleted.whiteId || undefined, name: deleted.whiteName || undefined },
+            black: { id: deleted.blackId || undefined, name: deleted.blackName || undefined },
+            startedAt: deleted.startedAt.getTime(),
+            endedAt: deleted.endedAt?.getTime() || undefined
         };
     }
     catch (err) {

@@ -21,6 +21,11 @@ export interface User {
     wins?: number;
     losses?: number;
     draws?: number;
+    subscriptionStatus?: string;
+    puzzleRating?: number;
+    division?: string;
+    xp?: number;
+    avatarUrl?: string;
 
     // mainly for players, not spectators
     connected?: boolean;
