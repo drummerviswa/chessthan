@@ -2,7 +2,7 @@ import type { User } from "../../types_config/index.d.ts";
 import { prisma } from "../index.js";
 
 export const create = async (user: User, password: string) => {
-    if (user.name === "Guest" || user.email === undefined || !user.name) {
+    if (user.name === "Guest" || !user.name) {
         return null;
     }
 
@@ -10,7 +10,7 @@ export const create = async (user: User, password: string) => {
         const newUser = await prisma.user.create({
             data: {
                 name: user.name,
-                email: user.email,
+                email: user.email || null,
                 password
             }
         });
@@ -23,7 +23,7 @@ export const create = async (user: User, password: string) => {
             draws: newUser.draws
         } as User;
     } catch (err: unknown) {
-        console.log(err);
+        console.error("UserModel.create error:", err);
         return null;
     }
 };

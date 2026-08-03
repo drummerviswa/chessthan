@@ -1,13 +1,13 @@
 import { prisma } from "../index.js";
 export const create = async (user, password) => {
-    if (user.name === "Guest" || user.email === undefined || !user.name) {
+    if (user.name === "Guest" || !user.name) {
         return null;
     }
     try {
         const newUser = await prisma.user.create({
             data: {
                 name: user.name,
-                email: user.email,
+                email: user.email || null,
                 password
             }
         });
@@ -21,7 +21,7 @@ export const create = async (user, password) => {
         };
     }
     catch (err) {
-        console.log(err);
+        console.error("UserModel.create error:", err);
         return null;
     }
 };

@@ -88,56 +88,37 @@ export const logoutSession = async (req, res) => {
 };
 export const registerUser = async (req, res) => {
     try {
-        if (req.session.user?.id && typeof req.session.user.id === "number") {
-            res.status(403).end();
+        const name = xss(req.body.name || "").trim();
+        const email = req.body.email ? xss(req.body.email).trim() : undefined;
+        const rawPassword = req.body.password;
+        if (!name || !rawPassword) {
+            res.status(400).json({ message: "Username and password are required." });
             return;
         }
-        const name = xss(req.body.name);
-        const email = xss(req.body.email);
-        const password = await hash(req.body.password);
-        const pattern = /^[A-Za-z0-9]+$/;
+        const pattern = /^[A-Za-z0-9_]+$/;
         if (!pattern.test(name)) {
-            res.status(400).end();
+            res.status(400).json({ message: "Username can only contain letters, numbers, and underscores." });
             return;
         }
-        const compareEmail = email || name;
-        const duplicateUsers = await UserModel.findByNameEmail({ name, email: compareEmail });
-        if (duplicateUsers && duplicateUsers.length) {
-            const dupl = duplicateUsers[0].name === name ? "Username" : "Email";
+        // Check duplicate username or email
+        const existingUser = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { name },
+                    ...(email ? [{ email }] : [])
+                ]
+            }
+        });
+        if (existingUser) {
+            const dupl = existingUser.name.toLowerCase() === name.toLowerCase() ? "Username" : "Email";
             res.status(409).json({ message: `${dupl} is already in use.` });
             return;
         }
-        const newUser = await UserModel.create({ name, email }, password);
+        const password = await hash(rawPassword);
+        const newUser = await UserModel.create({ name, email: email || undefined }, password);
         if (!newUser) {
-            throw new Error("Failed to create user");
-        }
-        const publicUser = {
-            id: newUser.id,
-            name: newUser.name
-        };
-        if (req.session.user?.id && typeof req.session.user.id === "string") {
-            const game = activeGames.find((g) => g.white?.id === req.session.user.id ||
-                g.black?.id === req.session.user.id ||
-                g.observers?.find((o) => o.id === req.session.user.id));
-            if (game) {
-                if (game.host?.id === req.session.user.id) {
-                    game.host = publicUser;
-                }
-                if (game.white && game.white?.id === req.session.user.id) {
-                    game.white = publicUser;
-                }
-                else if (game.black && game.black?.id === req.session.user.id) {
-                    game.black = publicUser;
-                }
-                else {
-                    const observer = game.observers?.find((o) => o.id === req.session.user.id);
-                    if (observer) {
-                        observer.id = publicUser.id;
-                        observer.name = publicUser.name;
-                    }
-                }
-                io.to(game.code).emit("receivedLatestGame", game);
-            }
+            res.status(500).json({ message: "Failed to create user account." });
+            return;
         }
         req.session.user = newUser;
         req.session.save(() => {
@@ -145,71 +126,55 @@ export const registerUser = async (req, res) => {
         });
     }
     catch (err) {
-        console.log(err);
-        res.status(500).end();
+        console.error("registerUser error:", err);
+        res.status(500).json({ message: "Internal server error" });
     }
 };
 export const loginUser = async (req, res) => {
     try {
-        if (req.session.user?.id && typeof req.session.user.id === "number") {
-            res.status(403).end();
-            return;
-        }
-        const nameOrEmail = xss(req.body.name);
+        const nameOrEmail = xss(req.body.name || req.body.username || "").trim();
         const password = req.body.password;
-        const users = await UserModel.findByNameEmail({ name: nameOrEmail, email: nameOrEmail }, true);
-        if (!users || !users.length) {
-            res.status(404).json({ message: "Invalid username/email." });
+        if (!nameOrEmail || !password) {
+            res.status(400).json({ message: "Username/Email and password are required." });
             return;
         }
-        const validPassword = await verify(users[0].password, password);
-        if (!validPassword) {
-            res.status(401).json({ message: "Invalid password." });
-            return;
-        }
-        const publicUser = {
-            id: users[0].id,
-            name: users[0].name
-        };
-        if (req.session.user?.id && typeof req.session.user.id === "string") {
-            const game = activeGames.find((g) => g.white?.id === req.session.user.id ||
-                g.black?.id === req.session.user.id ||
-                g.observers?.find((o) => o.id === req.session.user.id));
-            if (game) {
-                if (game.host?.id === req.session.user.id) {
-                    game.host = publicUser;
-                }
-                if (game.white && game.white?.id === req.session.user.id) {
-                    game.white = publicUser;
-                }
-                else if (game.black && game.black?.id === req.session.user.id) {
-                    game.black = publicUser;
-                }
-                else {
-                    const observer = game.observers?.find((o) => o.id === req.session.user.id);
-                    if (observer) {
-                        observer.id = publicUser.id;
-                        observer.name = publicUser.name;
-                    }
-                }
-                io.to(game.code).emit("receivedLatestGame", game);
+        // Find user by name OR email
+        const user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { name: nameOrEmail },
+                    { email: nameOrEmail }
+                ]
             }
+        });
+        if (!user || !user.password) {
+            res.status(404).json({ message: "Invalid username or password." });
+            return;
         }
-        req.session.user = {
-            id: users[0].id,
-            name: users[0].name,
-            email: users[0].email,
-            wins: users[0].wins,
-            losses: users[0].losses,
-            draws: users[0].draws
+        const validPassword = await verify(user.password, password);
+        if (!validPassword) {
+            res.status(401).json({ message: "Invalid username or password." });
+            return;
+        }
+        const sessionUser = {
+            id: user.id,
+            name: user.name,
+            email: user.email || undefined,
+            wins: user.wins,
+            losses: user.losses,
+            draws: user.draws,
+            avatarUrl: user.avatarUrl || undefined,
+            subscriptionStatus: user.subscriptionStatus || undefined,
+            puzzleRating: user.puzzleRating
         };
+        req.session.user = sessionUser;
         req.session.save(() => {
-            res.status(200).json(req.session.user);
+            res.status(200).json(sessionUser);
         });
     }
     catch (err) {
-        console.log(err);
-        res.status(500).end();
+        console.error("loginUser error:", err);
+        res.status(500).json({ message: "Internal server error" });
     }
 };
 export const updateUser = async (req, res) => {
@@ -284,43 +249,42 @@ export const updateUser = async (req, res) => {
 };
 export const oauthSession = async (req, res) => {
     try {
-        const name = xss(req.body.name || "");
-        const email = xss(req.body.email || "");
-        const avatarUrl = xss(req.body.avatarUrl || "");
-        if (!email) {
-            res.status(400).json({ message: "Email is required for OAuth login." });
-            return;
-        }
-        // Try to find user by email
-        let dbUser = await prisma.user.findUnique({
-            where: { email }
+        const name = xss(req.body.name || "").trim();
+        const email = xss(req.body.email || "").trim();
+        const avatarUrl = xss(req.body.avatarUrl || "").trim();
+        const searchEmail = email || `${(name || "player").toLowerCase()}@oauth.chessthan`;
+        // Try to find user by email or name
+        let dbUser = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { email: searchEmail },
+                    ...(name ? [{ name }] : [])
+                ]
+            }
         });
         if (!dbUser) {
-            // Check if name is unique
-            let baseName = name.replace(/[^A-Za-z0-9]/g, "") || "ChessPlayer";
+            let baseName = name.replace(/[^A-Za-z0-9_]/g, "") || "ChessPlayer";
             let uniqueName = baseName;
             let counter = 1;
             while (await prisma.user.findUnique({ where: { name: uniqueName } })) {
                 uniqueName = `${baseName}${counter}`;
                 counter++;
             }
-            // Create new OAuth user
             dbUser = await prisma.user.create({
                 data: {
                     name: uniqueName,
-                    email,
-                    avatarUrl
+                    email: searchEmail,
+                    avatarUrl: avatarUrl || null
                 }
             });
         }
         else if (avatarUrl && dbUser.avatarUrl !== avatarUrl) {
-            // Update avatar if changed
             dbUser = await prisma.user.update({
                 where: { id: dbUser.id },
                 data: { avatarUrl }
             });
         }
-        res.status(200).json({
+        const sessionUser = {
             id: dbUser.id,
             name: dbUser.name,
             email: dbUser.email || undefined,
@@ -330,6 +294,10 @@ export const oauthSession = async (req, res) => {
             avatarUrl: dbUser.avatarUrl || undefined,
             subscriptionStatus: dbUser.subscriptionStatus || undefined,
             puzzleRating: dbUser.puzzleRating
+        };
+        req.session.user = sessionUser;
+        req.session.save(() => {
+            res.status(200).json(sessionUser);
         });
     }
     catch (err) {
