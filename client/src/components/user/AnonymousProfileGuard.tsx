@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { IconShieldLock, IconUserPlus, IconLogin, IconTrophy, IconChartLine, IconCrown } from "@tabler/icons-react";
-import { signIn } from "next-auth/react";
 
 interface AnonymousProfileGuardProps {
   guestName: string;
@@ -11,10 +10,19 @@ interface AnonymousProfileGuardProps {
 export default function AnonymousProfileGuard({ guestName }: AnonymousProfileGuardProps) {
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // Clear temporary/anonymous cached data
-      localStorage.removeItem("chessthan:guestData");
-      localStorage.removeItem("chessthan:anonSession");
-      sessionStorage.removeItem("chessthan:tempLobby");
+      // Delete all locally saved anonymous user data to ensure clean state
+      try {
+        localStorage.removeItem("chessthan:guestData");
+        localStorage.removeItem("chessthan:anonSession");
+        localStorage.removeItem("chessthan:guestId");
+        localStorage.removeItem("chessthan:tempUser");
+        localStorage.removeItem("chessthan:xp");
+        localStorage.removeItem("hs_rush");
+        localStorage.removeItem("hs_survival");
+        sessionStorage.clear();
+      } catch (err) {
+        console.error("Failed clearing local guest data:", err);
+      }
     }
   }, []);
 
@@ -33,7 +41,7 @@ export default function AnonymousProfileGuard({ guestName }: AnonymousProfileGua
             Guest Profile Restricted
           </h2>
           <p className="text-xs text-slate-400 font-medium">
-            Anonymous account (<span className="font-mono text-emerald-400 font-bold">{guestName}</span>)
+            Anonymous session (<span className="font-mono text-emerald-400 font-bold">{guestName}</span>)
           </p>
         </div>
 
@@ -63,23 +71,23 @@ export default function AnonymousProfileGuard({ guestName }: AnonymousProfileGua
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Actions triggering DaisyUI Auth Modal natively */}
         <div className="flex flex-col sm:flex-row gap-3 w-full mt-1">
-          <button
-            onClick={() => signIn()}
-            className="btn btn-emerald w-full sm:flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold border-0 gap-2 shadow-lg"
+          <label
+            htmlFor="auth-modal"
+            className="btn btn-emerald w-full sm:flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold border-0 gap-2 shadow-lg cursor-pointer flex items-center justify-center"
           >
             <IconLogin size={18} />
             Sign In
-          </button>
+          </label>
           
-          <button
-            onClick={() => signIn()}
-            className="btn w-full sm:flex-1 bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700 font-bold gap-2"
+          <label
+            htmlFor="auth-modal"
+            className="btn w-full sm:flex-1 bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700 font-bold gap-2 cursor-pointer flex items-center justify-center"
           >
             <IconUserPlus size={18} className="text-emerald-400" />
             Register Account
-          </button>
+          </label>
         </div>
       </div>
     </div>

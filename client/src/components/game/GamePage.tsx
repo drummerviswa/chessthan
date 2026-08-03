@@ -871,7 +871,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
             />
           </div>
         </div>
-        <div className="flex max-w-lg flex-1 flex-col items-center justify-center gap-4">
+        <div className="flex max-w-lg flex-1 flex-col items-center justify-center gap-4 w-full max-h-[380px] md:max-h-none overflow-y-auto md:overflow-visible pr-1 border-t border-slate-800/40 md:border-t-0 pt-2 md:pt-0">
           <div className="mb-auto flex w-full p-2">
             <div className="flex flex-1 flex-col items-center justify-between">
               {getPlayerHtml("top")}
