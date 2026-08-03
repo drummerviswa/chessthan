@@ -4,16 +4,24 @@ import { io } from "../server.js";
 function parseTimeControl(timeControl) {
     if (!timeControl || timeControl.toLowerCase().includes("casual"))
         return null;
-    const match = timeControl.match(/(\d+)(?:\+|\||:)?(\d+)?/);
+    const match = timeControl.match(/(\d+)\s*(?:\+|\||d|:)?\s*(\d+)?/i);
     if (!match)
         return null;
     const baseMin = parseInt(match[1]);
     const incSec = match[2] ? parseInt(match[2]) : 0;
     if (isNaN(baseMin) || baseMin <= 0)
         return null;
+    let mode = "constant";
+    if (timeControl.includes("d")) {
+        mode = "delay";
+    }
+    else if (incSec > 0) {
+        mode = "fischer";
+    }
     return {
         timeMs: baseMin * 60 * 1000,
-        incrementMs: incSec * 1000
+        incrementMs: incSec * 1000,
+        mode
     };
 }
 function startTurnTimer(game, activeSide) {
@@ -267,18 +275,40 @@ export async function sendMove(m) {
         const newMove = chess.move(m);
         if (newMove) {
             game.pgn = chess.pgn();
-            // Deduct turn timer
+            // Deduct turn timer & apply increment rules (Fischer / Delay / Constant)
             if (game.clocks) {
                 const elapsed = Date.now() - game.clocks.lastMoveTime;
                 const parsed = parseTimeControl(game.timeControl);
                 const inc = parsed ? parsed.incrementMs : 0;
-                if (prevTurn === "w") {
-                    game.clocks.white = Math.max(0, game.clocks.white - elapsed) + inc;
+                const mode = parsed ? parsed.mode : "constant";
+                let timeDeducted = elapsed;
+                let timeAdded = 0;
+                if (mode === "fischer") {
+                    timeDeducted = elapsed;
+                    timeAdded = inc;
+                }
+                else if (mode === "delay") {
+                    timeDeducted = Math.max(0, elapsed - inc);
+                    timeAdded = 0;
                 }
                 else {
-                    game.clocks.black = Math.max(0, game.clocks.black - elapsed) + inc;
+                    timeDeducted = elapsed;
+                    timeAdded = 0;
+                }
+                if (prevTurn === "w") {
+                    game.clocks.white = Math.max(0, game.clocks.white - timeDeducted) + timeAdded;
+                }
+                else {
+                    game.clocks.black = Math.max(0, game.clocks.black - timeDeducted) + timeAdded;
                 }
                 game.clocks.lastMoveTime = Date.now();
+                // Broadcast synchronized clocks to room
+                io.to(game.code).emit("clockSync", game.clocks);
+                // Check for immediate clock timeout
+                if ((prevTurn === "w" && game.clocks.white <= 0) || (prevTurn === "b" && game.clocks.black <= 0)) {
+                    await handleTimeoutLoss(game, prevTurn);
+                    return;
+                }
                 // Toggle active clock turn timer
                 const nextTurn = chess.turn();
                 startTurnTimer(game, nextTurn);
