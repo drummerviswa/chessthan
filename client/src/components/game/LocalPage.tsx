@@ -156,7 +156,21 @@ function LocalPageContent() {
     const [gameStatus, setGameStatus] = useState<string>("White to move");
     const [isGameOver, setIsGameOver] = useState(false);
     
-    // Theme loader
+    const [boardWidth, setBoardWidth] = useState(480);
+
+    useEffect(() => {
+        const updateSize = () => {
+            if (typeof window !== "undefined") {
+                const padding = window.innerWidth < 640 ? 24 : 64;
+                const availableWidth = window.innerWidth - padding;
+                const calculated = Math.min(availableWidth, 520);
+                setBoardWidth(calculated > 280 ? calculated : 280);
+            }
+        };
+        updateSize();
+        window.addEventListener("resize", updateSize);
+        return () => window.removeEventListener("resize", updateSize);
+    }, []);
     const [boardTheme, setBoardTheme] = useState({ dark: "#0e4a3b", light: "#eeeddf" });
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -534,7 +548,7 @@ function LocalPageContent() {
         <div className="flex flex-col lg:flex-row gap-8 w-full max-w-5xl items-center lg:items-start justify-center p-4">
             
             {/* Left section: Chessboard with Bot Info Card */}
-            <div className="w-full max-w-[460px] flex flex-col items-center">
+            <div className="w-full flex flex-col items-center" style={{ maxWidth: `${boardWidth}px` }}>
                 
                 {/* Active Bot Speech Bubble Panel */}
                 {mode === "bot" && (
@@ -580,6 +594,7 @@ function LocalPageContent() {
                 {/* Chessboard container */}
                 <div className="w-full shadow-2xl rounded-b-xl overflow-hidden bg-base-100 border border-base-300">
                     <Chessboard
+                        boardWidth={boardWidth}
                         position={gameFen}
                         onPieceDrop={onDrop}
                         onSquareClick={onSquareClick}

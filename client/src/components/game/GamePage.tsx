@@ -87,6 +87,20 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
 
   const [moveFrom, setMoveFrom] = useState<string | Square | null>(null);
   const [boardWidth, setBoardWidth] = useState(480);
+
+  useEffect(() => {
+    const updateSize = () => {
+      if (typeof window !== "undefined") {
+        const padding = window.innerWidth < 640 ? 24 : 64;
+        const availableWidth = window.innerWidth - padding;
+        const calculated = Math.min(availableWidth, 520);
+        setBoardWidth(calculated > 280 ? calculated : 280);
+      }
+    };
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
   const chessboardRef = useRef<ClearPremoves>(null);
 
   const [navFen, setNavFen] = useState<string | null>(null);

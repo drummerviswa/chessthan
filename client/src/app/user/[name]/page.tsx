@@ -10,8 +10,7 @@ import {
   IconSwords,
   IconClock,
   IconHourglass,
-  IconPuzzle,
-  IconShieldLock
+  IconPuzzle
 } from "@tabler/icons-react";
 
 export async function generateMetadata({ params }: { params: { name: string } }) {
@@ -27,29 +26,14 @@ export async function generateMetadata({ params }: { params: { name: string } })
   };
 }
 
+import AnonymousProfileGuard from "@/components/user/AnonymousProfileGuard";
+
 export default async function Profile({ params }: { params: { name: string } }) {
   const data = await fetchProfileData(params.name);
-  const isGuestProfile = !data || params.name.startsWith("Guest_");
+  const isGuestProfile = !data || params.name.startsWith("Guest_") || params.name.startsWith("guest_") || params.name.toLowerCase().includes("guest");
 
   if (isGuestProfile) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[65vh] px-4">
-        <div className="card w-full max-w-md bg-[#121620] border border-[#1f293d] shadow-2xl p-8 text-center rounded-2xl gap-4 animate__animated animate__fadeIn">
-          <div className="p-4 bg-emerald-950/40 rounded-full text-emerald-400 border border-emerald-800/50 w-16 h-16 mx-auto flex items-center justify-center">
-            <IconShieldLock className="w-8 h-8" />
-          </div>
-          <h2 className="text-xl font-bold text-white tracking-wide">Guest Account Restricted</h2>
-          <p className="text-xs text-slate-400">
-            Guest sessions (<span className="font-mono text-emerald-400">{params.name}</span>) do not maintain persistent public rating statistics. Register or log in to a permanent account to track ELO progression, win rates, and match reviews!
-          </p>
-          <div className="flex gap-3 mt-2">
-            <a href="/" className="btn btn-sm w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold border-0">
-              Sign In / Register Account
-            </a>
-          </div>
-        </div>
-      </div>
-    );
+    return <AnonymousProfileGuard guestName={params.name} />;
   }
 
   // League badge icon
