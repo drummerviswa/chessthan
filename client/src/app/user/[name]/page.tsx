@@ -30,11 +30,29 @@ import AnonymousProfileGuard from "@/components/user/AnonymousProfileGuard";
 
 export default async function Profile({ params }: { params: { name: string } }) {
   const data = await fetchProfileData(params.name);
-  const isGuestProfile = !data || params.name.startsWith("Guest_") || params.name.startsWith("guest_") || params.name.toLowerCase().includes("guest");
+
+  // Only show the anonymous guard if: data doesn't exist AND name looks like a guest session
+  const looksLikeGuest =
+    params.name.startsWith("Guest_") ||
+    params.name.startsWith("guest_") ||
+    /^[Gg]uest\d+$/.test(params.name);
+  const isGuestProfile = !data && looksLikeGuest;
 
   if (isGuestProfile) {
     return <AnonymousProfileGuard guestName={params.name} />;
   }
+
+  // If no data but not a guest name, show a "user not found" message
+  if (!data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
+        <h1 className="text-3xl font-black">Player not found</h1>
+        <p className="text-base-content/60">No profile exists for <b>{params.name}</b>.</p>
+        <a href="/" className="btn btn-primary btn-sm">Go Home</a>
+      </div>
+    );
+  }
+
 
   // League badge icon
   let LeagueIcon = IconShield;

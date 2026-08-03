@@ -46,7 +46,12 @@ export default function Settings() {
   const [adminTheme, setAdminTheme] = useState("Sacrifice, Attacking");
   const [adminPuzzleMsg, setAdminPuzzleMsg] = useState("");
 
-  const isGuest = !session?.user || !session.user?.id || typeof session.user.id !== "number";
+  // Only block completely anonymous users (no session, or raw guest session strings)
+  const userId = session?.user?.id;
+  const isGuest =
+    !session?.user ||
+    !userId ||
+    (typeof userId === "string" && (userId.startsWith("guest_") || userId.startsWith("Guest_")));
 
   if (isGuest) {
     return (
@@ -55,19 +60,20 @@ export default function Settings() {
           <div className="p-4 bg-emerald-950/40 rounded-full text-emerald-400 border border-emerald-800/50 w-16 h-16 mx-auto flex items-center justify-center">
             <IconShieldLock className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-bold text-white tracking-wide">Account Access Restricted</h2>
+          <h2 className="text-xl font-bold text-white tracking-wide">Sign In Required</h2>
           <p className="text-xs text-slate-400">
-            Guest accounts cannot edit profile settings, sync Chess.com statistics, or create admin puzzles. Please log in or register a full account to manage your profile.
+            Please log in or register a full account to manage your profile settings, sync Chess.com stats, or create puzzles.
           </p>
           <div className="flex gap-3 mt-2">
-            <a href="/" className="btn btn-sm w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold border-0">
-              Sign In / Register Account
-            </a>
+            <label htmlFor="auth-modal" className="btn btn-sm w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold border-0 cursor-pointer">
+              Sign In / Register
+            </label>
           </div>
         </div>
       </div>
     );
   }
+
 
   async function updateAccount(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();

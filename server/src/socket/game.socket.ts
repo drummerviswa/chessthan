@@ -75,67 +75,61 @@ export async function joinLobby(this: Socket, gameCode: string) {
     if (!game) return;
 
     const uId = this.request.session?.user?.id !== undefined ? String(this.request.session.user.id) : "";
-    const uName = this.request.session?.user?.name ? String(this.request.session.user.name).trim().toLowerCase() : "";
+    const uName = this.request.session?.user?.name || "";
 
     const hId = game.host?.id !== undefined ? String(game.host.id) : "";
-    const hName = game.host?.name ? String(game.host.name).trim().toLowerCase() : "";
-
     const wId = game.white?.id !== undefined ? String(game.white.id) : "";
-    const wName = game.white?.name ? String(game.white.name).trim().toLowerCase() : "";
-
     const bId = game.black?.id !== undefined ? String(game.black.id) : "";
-    const bName = game.black?.name ? String(game.black.name).trim().toLowerCase() : "";
 
-    if (game.host && ((uId && hId && uId === hId) || (uName && hName && uName === hName))) {
+    // Update host connection state
+    if (game.host && uId && hId && uId === hId) {
         game.host.connected = true;
-        if (this.request.session.user.name) game.host.name = this.request.session.user.name;
+        if (uName) game.host.name = uName;
     }
 
     let matchedPlayer = false;
-    if (game.white && ((uId && wId && uId === wId) || (uName && wName && uName === wName))) {
+
+    // Reconnect to existing white slot
+    if (game.white && uId && wId && uId === wId) {
         game.white.connected = true;
         game.white.disconnectedOn = undefined;
-        if (this.request.session.user.name) game.white.name = this.request.session.user.name;
+        if (uName) game.white.name = uName;
         matchedPlayer = true;
     }
-    if (game.black && ((uId && bId && uId === bId) || (uName && bName && uName === bName))) {
+
+    // Reconnect to existing black slot
+    if (game.black && uId && bId && uId === bId) {
         game.black.connected = true;
         game.black.disconnectedOn = undefined;
-        if (this.request.session.user.name) game.black.name = this.request.session.user.name;
+        if (uName) game.black.name = uName;
         matchedPlayer = true;
     }
-    
-    // Auto-pair incoming opponent to the open side slot
+
+    // New player joining — assign to the empty color slot (opposite of host)
     if (!matchedPlayer) {
-        if (game.white && !game.black) {
-            game.black = {
-                id: this.request.session.user.id,
-                name: this.request.session.user.name,
-                connected: true
-            };
+        const sessionUser = {
+            id: this.request.session.user.id,
+            name: uName,
+            connected: true
+        };
+
+        if (game.white && !game.black && (!wId || wId !== uId)) {
+            // White slot taken (by someone else) — assign new player as black
+            game.black = sessionUser;
             matchedPlayer = true;
-        } else if (game.black && !game.white) {
-            game.white = {
-                id: this.request.session.user.id,
-                name: this.request.session.user.name,
-                connected: true
-            };
+        } else if (game.black && !game.white && (!bId || bId !== uId)) {
+            // Black slot taken (by someone else) — assign new player as white
+            game.white = sessionUser;
             matchedPlayer = true;
         } else if (!game.white && !game.black) {
-            game.white = {
-                id: this.request.session.user.id,
-                name: this.request.session.user.name,
-                connected: true
-            };
+            // No slots taken — assign as white (game host sets their color on create)
+            game.white = sessionUser;
             matchedPlayer = true;
         } else {
+            // Both slots full — add as observer
             if (!game.observers) game.observers = [];
-            const user = {
-                id: this.request.session.user.id,
-                name: this.request.session.user.name
-            };
-            if (!game.observers.some((o) => String(o.id) === uId || o.name === user.name)) {
-                game.observers.push(user);
+            if (!game.observers.some((o) => uId && String(o.id) === uId)) {
+                game.observers.push({ id: this.request.session.user.id, name: uName });
             }
         }
     }
@@ -149,9 +143,23 @@ export async function joinLobby(this: Socket, gameCode: string) {
         game.timeout = undefined;
     }
 
+    // Initialize clocks when both players are seated
+    if (game.white && game.black && !game.clocks) {
+        const { parseTimeControl } = await import("./game.socket.js");
+        const parsed = parseTimeControl(game.timeControl);
+        if (parsed) {
+            game.clocks = {
+                white: parsed.timeMs,
+                black: parsed.timeMs,
+                lastMoveTime: Date.now()
+            };
+        }
+    }
+
     await this.join(gameCode);
     io.to(game.code as string).emit("receivedLatestGame", game);
 }
+
 
 export async function leaveLobby(this: Socket, reason?: DisconnectReason, code?: string) {
     if (this.rooms.size >= 3 && !code) {
