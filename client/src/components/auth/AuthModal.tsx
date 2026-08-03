@@ -179,7 +179,7 @@ export default function AuthModal() {
         className={"modal" + (session?.user === null ? " modal-open" : "")}
       >
         <label className="modal-box flex max-w-sm flex-col gap-4 pt-2">
-          {session?.user?.id && (typeof session.user.id === "number" || typeof session.user.id === "string" && !session.user.id.startsWith("chessthan")) ? (
+          {session?.user?.id ? (
             <div className="flex flex-col gap-2 pt-2">
               <div className="flex w-full justify-between items-center mb-2">
                 <div>
@@ -331,7 +331,7 @@ export default function AuthModal() {
                 )}
 
                 <div className="modal-action items-center mt-6">
-                  {session?.user !== null && (
+                  {session?.user !== null && session?.user !== undefined && (
                     <label htmlFor="auth-modal" className="btn btn-sm btn-ghost">
                       Close
                     </label>

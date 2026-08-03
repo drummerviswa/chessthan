@@ -8,41 +8,49 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { fetchSession } from "@/lib/auth";
 import { SessionContext } from "./session";
 
-// Syncs Auth.js NextAuth session with the legacy SessionContext state
+// Syncs NextAuth JWT session with the legacy SessionContext
 function SessionSyncWrapper({ children }: { children: ReactNode }) {
-  const { data: authSession } = useSession();
+  const { data: authSession, status } = useSession();
   const session = useContext(SessionContext);
 
   useEffect(() => {
+    // Still fetching JWT from cookie — do nothing yet (keeps "undefined" = loading state)
+    if (status === "loading") return;
+
     if (authSession?.user) {
+      // NextAuth confirmed an active session (credentials OR OAuth)
+      const u = authSession.user as any;
       session?.setUser({
-        id: (authSession.user as any).id,
-        name: authSession.user.name,
-        email: authSession.user.email || undefined,
-        wins: (authSession.user as any).wins,
-        losses: (authSession.user as any).losses,
-        draws: (authSession.user as any).draws,
-        avatarUrl: (authSession.user as any).avatarUrl,
-        subscriptionStatus: (authSession.user as any).subscriptionStatus,
-        puzzleRating: (authSession.user as any).puzzleRating
+        id: u.id || u.name || "user",
+        name: u.name || "User",
+        email: u.email || undefined,
+        wins: u.wins || 0,
+        losses: u.losses || 0,
+        draws: u.draws || 0,
+        avatarUrl: u.avatarUrl || u.image || undefined,
+        subscriptionStatus: u.subscriptionStatus || undefined,
+        puzzleRating: u.puzzleRating || 1200
       });
     } else {
-      // Fallback: check if there's an active legacy guest session
-      fetchSession().then((user) => {
-        if (user) {
-          session?.setUser(user);
-        } else {
+      // NextAuth says no JWT session — try legacy express session cookie (guest users)
+      fetchSession()
+        .then((user) => {
+          // Only set to null if the backend confirms no session either
+          session?.setUser(user ?? null);
+        })
+        .catch(() => {
+          // Backend unreachable (cold start etc.) — treat as no session
           session?.setUser(null);
-        }
-      });
+        });
     }
-  }, [authSession]);
+  }, [authSession, status]);
 
   return <>{children}</>;
 }
 
 export default function ContextProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>({});
+  // Start as undefined = "loading, don't show modal yet"
+  const [user, setUser] = useState<User | null | undefined>(undefined);
 
   return (
     <SessionProvider>
