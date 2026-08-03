@@ -6,7 +6,8 @@
     "scripts": {
         "isolated-install": "pnpm -w install:server",
         "start": "node dist/server.js",
-        "build": "tsc",
+        "build": "prisma generate && tsc",
+        "postinstall": "prisma generate",
         "dev": "tsc-watch --noClear --onSuccess \"node dist/server.js\""
     },
     "dependencies": {
