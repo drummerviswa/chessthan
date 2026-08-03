@@ -11,7 +11,7 @@ const getAudioContext = (): AudioContext => {
     return audioCtx!;
 };
 
-export const playSound = (type: "move" | "capture" | "check" | "win" | "loss" | "draw") => {
+export const playSound = (type: "move" | "capture" | "check" | "win" | "loss" | "draw" | "lowTime") => {
     try {
         const ctx = getAudioContext();
         if (!ctx) return;
@@ -23,7 +23,24 @@ export const playSound = (type: "move" | "capture" | "check" | "win" | "loss" | 
 
         const now = ctx.currentTime;
 
-        if (type === "move") {
+        if (type === "lowTime") {
+            // Wood tick sound for clock counting down
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(250, now + 0.04);
+
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+            osc.start(now);
+            osc.stop(now + 0.04);
+
+        } else if (type === "move") {
             // Crisp wood click sound
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
@@ -151,10 +168,12 @@ export const playSound = (type: "move" | "capture" | "check" | "win" | "loss" | 
 };
 
 // Vibration API haptic helper
-export const triggerHaptic = (type: "move" | "capture" | "check" | "gameover") => {
+export const triggerHaptic = (type: "move" | "capture" | "check" | "gameover" | "lowTime") => {
     if (typeof window === "undefined" || !navigator.vibrate) return;
 
-    if (type === "move") {
+    if (type === "lowTime") {
+        navigator.vibrate(8);
+    } else if (type === "move") {
         navigator.vibrate(12); // Short pulse
     } else if (type === "capture") {
         navigator.vibrate(25); // Heavy pulse

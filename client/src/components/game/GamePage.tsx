@@ -5,7 +5,6 @@ import check from "public/check.json";
 
 import {
   IconCopy,
-  IconClock
 } from "@tabler/icons-react";
 
 import type { FormEvent, KeyboardEvent } from "react";
@@ -24,6 +23,7 @@ import { Chessboard } from "react-chessboard";
 import { API_URL } from "@/config";
 import { io } from "socket.io-client";
 
+import ChessClock from "./ChessClock";
 import { lobbyReducer, squareReducer } from "./reducers";
 import { initSocket } from "./socketEvents";
 import { syncPgn, syncSide } from "./utils";
@@ -74,19 +74,6 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
 
     return () => clearInterval(interval);
   }, [lobby.clocks, lobby.winner, lobby.endReason, lobby.white, lobby.black, lobby.actualGame]);
-
-  function formatClockTime(ms: number) {
-    if (ms <= 0) return "0:00.0";
-    const totalSecs = Math.floor(ms / 1000);
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-
-    if (ms < 10000) {
-      const tenths = Math.floor((ms % 1000) / 100);
-      return `${mins}:${secs < 10 ? "0" : ""}${secs}.${tenths}`;
-    }
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-  }
 
   const [customSquares, updateCustomSquares] = useReducer(squareReducer, {
     options: {},
@@ -612,94 +599,38 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   }
 
   function getPlayerHtml(side: "top" | "bottom") {
-    const blackHtml = (
-      <div className="flex w-full items-center justify-between bg-base-200 border border-base-300 p-3 rounded-xl mb-1.5 shadow-sm">
-        <div className="flex flex-col">
-          <a
-            className={
-              (lobby.black?.name ? "font-bold" : "text-base-content/40 italic") +
-              (typeof lobby.black?.id === "number"
-                ? " text-primary link-hover"
-                : " cursor-default")
-            }
-            href={
-              typeof lobby.black?.id === "number"
-                ? `/user/${lobby.black?.name}`
-                : undefined
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {lobby.black?.name || "(Waiting for opponent)"}
-          </a>
-          <span className="flex items-center gap-1 text-[10px] text-base-content/50 font-bold uppercase">
-            ⚫ Black
-            {lobby.black && lobby.black.connected === false && (
-              <span className="badge badge-xs badge-error">disconnected</span>
-            )}
-          </span>
-        </div>
+    const isTurnBlack = lobby.actualGame.turn() === "b";
+    const isTurnWhite = lobby.actualGame.turn() === "w";
+    const gameOver = !!(lobby.winner || lobby.endReason);
 
-        {/* Clock badge */}
-        {clocks && (
-          <div className={`px-3.5 py-1.5 rounded-xl font-mono text-sm font-black tracking-wider transition-all shadow-md flex items-center gap-1.5 ${
-            clocks.black < 20000 && lobby.actualGame.turn() === "b" && !lobby.winner && !lobby.endReason
-              ? "bg-rose-950 border border-rose-600 text-rose-300 animate-pulse ring-2 ring-rose-500/50"
-              : lobby.actualGame.turn() === "b" && !lobby.winner && !lobby.endReason
-              ? "bg-emerald-600 text-white animate-pulse ring-2 ring-emerald-500/40 shadow-lg"
-              : "bg-base-300 text-slate-300 border border-base-300/80"
-          }`}>
-            <IconClock size={14} className={lobby.actualGame.turn() === "b" ? "text-amber-400 animate-spin" : "opacity-40"} />
-            {formatClockTime(clocks.black)}
-          </div>
-        )}
-      </div>
+    const blackHtml = (
+      <ChessClock
+        side="black"
+        playerName={lobby.black?.name || "Waiting for opponent..."}
+        rating={1500}
+        timeMs={clocks?.black ?? 600000}
+        isActiveTurn={isTurnBlack}
+        isGameOver={gameOver}
+        timeControl={lobby.timeControl}
+      />
     );
     const whiteHtml = (
-      <div className="flex w-full items-center justify-between bg-base-200 border border-base-300 p-3 rounded-xl mb-1.5 shadow-sm">
-        <div className="flex flex-col">
-          <a
-            className={
-              (lobby.white?.name ? "font-bold" : "text-base-content/40 italic") +
-              (typeof lobby.white?.id === "number"
-                ? " text-primary link-hover"
-                : " cursor-default")
-            }
-            href={
-              typeof lobby.white?.id === "number"
-                ? `/user/${lobby.white?.name}`
-                : undefined
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {lobby.white?.name || "(Waiting for opponent)"}
-          </a>
-          <span className="flex items-center gap-1 text-[10px] text-base-content/50 font-bold uppercase">
-            ⚪ White
-            {lobby.white && lobby.white.connected === false && (
-              <span className="badge badge-xs badge-error">disconnected</span>
-            )}
-          </span>
-        </div>
-
-        {/* Clock badge */}
-        {clocks && (
-          <div className={`px-3.5 py-1.5 rounded-xl font-mono text-sm font-black tracking-wider transition-all shadow-md flex items-center gap-1.5 ${
-            clocks.white < 20000 && lobby.actualGame.turn() === "w" && !lobby.winner && !lobby.endReason
-              ? "bg-rose-950 border border-rose-600 text-rose-300 animate-pulse ring-2 ring-rose-500/50"
-              : lobby.actualGame.turn() === "w" && !lobby.winner && !lobby.endReason
-              ? "bg-emerald-600 text-white animate-pulse ring-2 ring-emerald-500/40 shadow-lg"
-              : "bg-base-300 text-slate-300 border border-base-300/80"
-          }`}>
-            <IconClock size={14} className={lobby.actualGame.turn() === "w" ? "text-amber-400 animate-spin" : "opacity-40"} />
-            {formatClockTime(clocks.white)}
-          </div>
-        )}
-      </div>
+      <ChessClock
+        side="white"
+        playerName={lobby.white?.name || "Waiting for opponent..."}
+        rating={1500}
+        timeMs={clocks?.white ?? 600000}
+        isActiveTurn={isTurnWhite}
+        isGameOver={gameOver}
+        timeControl={lobby.timeControl}
+      />
     );
 
-    const isUserBlack = lobby.side === "b" || (session?.user && String(lobby.black?.id) === String(session.user.id)) || (session?.user?.name && lobby.black?.name === session.user.name);
+    const isUserBlack =
+      lobby.side === "b" ||
+      (session?.user && String(lobby.black?.id) === String(session.user.id)) ||
+      (session?.user?.name && lobby.black?.name === session.user.name);
+
     if (isUserBlack) {
       return side === "top" ? whiteHtml : blackHtml;
     } else {
