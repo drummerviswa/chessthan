@@ -5,7 +5,7 @@ import type { DisconnectReason, Socket } from "socket.io";
 import GameModel, { activeGames } from "../db/models/game.model.js";
 import { io } from "../server.js";
 
-function parseTimeControl(timeControl: string | undefined): { timeMs: number; incrementMs: number; mode: "fischer" | "delay" | "constant" } | null {
+export function parseTimeControl(timeControl: string | undefined): { timeMs: number; incrementMs: number; mode: "fischer" | "delay" | "constant" } | null {
     if (!timeControl || timeControl.toLowerCase().includes("casual")) return null;
     const match = timeControl.match(/(\d+)\s*(?:\+|\||d|:)?\s*(\d+)?/i);
     if (!match) return null;

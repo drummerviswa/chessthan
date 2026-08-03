@@ -1,7 +1,7 @@
 import { Chess } from "chess.js";
 import GameModel, { activeGames } from "../db/models/game.model.js";
 import { io } from "../server.js";
-function parseTimeControl(timeControl) {
+export function parseTimeControl(timeControl) {
     if (!timeControl || timeControl.toLowerCase().includes("casual"))
         return null;
     const match = timeControl.match(/(\d+)\s*(?:\+|\||d|:)?\s*(\d+)?/i);

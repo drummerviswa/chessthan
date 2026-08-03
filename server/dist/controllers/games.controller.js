@@ -3,6 +3,7 @@ import GameModel, { activeGames } from "../db/models/game.model.js";
 import { generateThematicRoomCode } from "../utils/wordGenerator.js";
 import { explainMove, generateGameReview } from "../lib/aiCoach.js";
 import { generateChess960Fen } from "../utils/chess960.js";
+import { parseTimeControl } from "../socket/game.socket.js";
 export const getGames = async (req, res) => {
     try {
         if (!req.query.id && !req.query.userid) {
@@ -88,6 +89,7 @@ export const createGame = async (req, res) => {
         const variant = req.body.variant || "standard";
         const timeControl = req.body.timeControl || "Casual";
         const rated = req.body.rated ?? false;
+        const parsedTC = parseTimeControl(timeControl);
         const game = {
             code,
             unlisted,
@@ -95,7 +97,14 @@ export const createGame = async (req, res) => {
             pgn: "",
             variant,
             timeControl,
-            rated
+            rated,
+            clocks: parsedTC
+                ? {
+                    white: parsedTC.timeMs,
+                    black: parsedTC.timeMs,
+                    lastMoveTime: Date.now()
+                }
+                : undefined
         };
         if (variant === "chess960") {
             game.initialFen = generateChess960Fen();

@@ -48,7 +48,9 @@ export default function Home() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     unlisted: false,
-                    side
+                    side,
+                    timeControl,
+                    variant: "standard"
                 }),
                 credentials: "include"
             });
