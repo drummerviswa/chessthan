@@ -54,45 +54,48 @@ export const syncSide = (
 ) => {
     if (!game) game = lobby;
 
-    const uId = user?.id !== undefined ? String(user.id) : undefined;
-    const uName = user?.name ? String(user.name).trim().toLowerCase() : undefined;
+    // Use strict ID matching only — names are not unique enough (guests share patterns)
+    const uId = user?.id !== undefined ? String(user.id) : "";
 
-    const bId = game.black?.id !== undefined ? String(game.black.id) : undefined;
-    const bName = game.black?.name ? String(game.black.name).trim().toLowerCase() : undefined;
+    const bId = game.black?.id !== undefined ? String(game.black.id) : "";
+    const wId = game.white?.id !== undefined ? String(game.white.id) : "";
 
-    const wId = game.white?.id !== undefined ? String(game.white.id) : undefined;
-    const wName = game.white?.name ? String(game.white.name).trim().toLowerCase() : undefined;
+    const isWhiteUser = !!(uId && wId && uId === wId);
+    const isBlackUser = !!(uId && bId && uId === bId);
 
-    const isWhiteUser = (uId && wId && uId === wId) || (uName && wName && uName === wName);
-    const isBlackUser = (uId && bId && uId === bId) || (uName && bName && uName === bName);
-
-    // 1. Direct match on Black
-    if (isBlackUser) {
-        if (lobby.side !== "b") actions.updateLobby({ type: "setSide", payload: "b" });
-        return;
-    }
-
-    // 2. Direct match on White
+    // 1. Direct ID match on White
     if (isWhiteUser) {
         if (lobby.side !== "w") actions.updateLobby({ type: "setSide", payload: "w" });
         return;
     }
 
-    // 3. Opponent auto-joining open slot:
-    // If game has White but no Black, and user is not White -> user claims Black ("b")
-    if (game.white && !game.black && !isWhiteUser) {
+    // 2. Direct ID match on Black
+    if (isBlackUser) {
         if (lobby.side !== "b") actions.updateLobby({ type: "setSide", payload: "b" });
         return;
     }
 
-    // If game has Black but no White, and user is not Black -> user claims White ("w")
-    if (game.black && !game.white && !isBlackUser) {
+    // 3. No ID match found — decide based on which slot is empty
+    // (handles the case where game was just paired and server hasn't echoed the final state yet)
+    if (game.white && !game.black) {
+        // White slot taken by someone else → we must be black
+        if (lobby.side !== "b") actions.updateLobby({ type: "setSide", payload: "b" });
+        return;
+    }
+
+    if (game.black && !game.white) {
+        // Black slot taken by someone else → we must be white
         if (lobby.side !== "w") actions.updateLobby({ type: "setSide", payload: "w" });
         return;
     }
 
-    // 4. Spectator if room is full with 2 distinct players
-    if (game.white && game.black && !isWhiteUser && !isBlackUser) {
+    // 4. Both slots taken and neither matches → spectator
+    if (game.white && game.black) {
         if (lobby.side !== "s") actions.updateLobby({ type: "setSide", payload: "s" });
+        return;
     }
+
+    // 5. No slots taken yet → spectator/waiting
+    if (lobby.side !== "s") actions.updateLobby({ type: "setSide", payload: "s" });
 };
+

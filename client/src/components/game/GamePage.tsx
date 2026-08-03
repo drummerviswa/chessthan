@@ -645,8 +645,8 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
 
     const isUserBlack =
       lobby.side === "b" ||
-      (session?.user && String(lobby.black?.id) === String(session.user.id)) ||
-      (session?.user?.name && lobby.black?.name === session.user.name);
+      (!!(session?.user && lobby.black?.id !== undefined && String(lobby.black.id) === String(session.user.id)));
+
 
     if (isUserBlack) {
       return side === "top" ? whiteHtml : blackHtml;
