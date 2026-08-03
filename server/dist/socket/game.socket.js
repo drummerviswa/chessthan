@@ -60,10 +60,19 @@ async function handleTimeoutLoss(game, losingSide) {
         activeGames.splice(idx, 1);
 }
 // TODO: clean up
-export async function joinLobby(gameCode) {
+export async function joinLobby(gameCode, clientUser) {
     const game = activeGames.find((g) => g.code === gameCode);
     if (!game)
         return;
+    if (clientUser && clientUser.id !== undefined && clientUser.id !== null) {
+        if (!this.request.session) {
+            this.request.session = {};
+        }
+        this.request.session.user = {
+            id: clientUser.id,
+            name: clientUser.name || "Player"
+        };
+    }
     const uId = this.request.session?.user?.id !== undefined ? String(this.request.session.user.id) : "";
     const uName = this.request.session?.user?.name || "";
     const hId = game.host?.id !== undefined ? String(game.host.id) : "";

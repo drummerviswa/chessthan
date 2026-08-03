@@ -59,8 +59,10 @@ export default function CreateGame() {
             isUnlisted,
             variant,
             timeLabel,
-            isRated
+            isRated,
+            session?.user || undefined
         );
+
 
         if (game) {
             router.push(`/${game.code}`);

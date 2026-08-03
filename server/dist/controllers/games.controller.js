@@ -68,19 +68,32 @@ export const getActiveGame = async (req, res) => {
 };
 export const createGame = async (req, res) => {
     try {
-        if (!req.session.user?.id) {
-            const guestId = `guest_${Math.random().toString(36).substring(2, 9)}`;
-            const guestName = `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
-            req.session.user = {
-                id: guestId,
-                name: guestName
+        let user;
+        if (req.body.user && req.body.user.id !== undefined && req.body.user.id !== null) {
+            user = {
+                id: req.body.user.id,
+                name: req.body.user.name || "Player",
+                connected: true
+            };
+            req.session.user = user;
+        }
+        else if (req.session.user?.id) {
+            user = {
+                id: req.session.user.id,
+                name: req.session.user.name || "Guest",
+                connected: true
             };
         }
-        const user = {
-            id: req.session.user.id,
-            name: req.session.user.name || "Guest",
-            connected: true
-        };
+        else {
+            const guestId = `guest_${Math.random().toString(36).substring(2, 9)}`;
+            const guestName = `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+            user = {
+                id: guestId,
+                name: guestName,
+                connected: true
+            };
+            req.session.user = user;
+        }
         const unlisted = req.body.unlisted ?? false;
         let code = generateThematicRoomCode();
         while (activeGames.some((g) => g.code === code)) {

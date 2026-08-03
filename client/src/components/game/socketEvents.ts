@@ -20,11 +20,12 @@ export function initSocket(
     }
 ) {
     socket.on("connect", () => {
-        socket.emit("joinLobby", lobby.code);
+        socket.emit("joinLobby", lobby.code, getUser());
     });
     if (socket.connected) {
-        socket.emit("joinLobby", lobby.code);
+        socket.emit("joinLobby", lobby.code, getUser());
     }
+
     // TODO: handle disconnect
 
     // Authoritative side assignment from server — no client-side ID guessing needed

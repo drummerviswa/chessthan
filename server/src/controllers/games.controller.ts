@@ -70,19 +70,31 @@ export const getActiveGame = async (req: Request, res: Response) => {
 };
 export const createGame = async (req: Request, res: Response) => {
     try {
-        if (!req.session.user?.id) {
+        let user: User;
+        if (req.body.user && req.body.user.id !== undefined && req.body.user.id !== null) {
+            user = {
+                id: req.body.user.id,
+                name: req.body.user.name || "Player",
+                connected: true
+            };
+            req.session.user = user;
+        } else if (req.session.user?.id) {
+            user = {
+                id: req.session.user.id,
+                name: req.session.user.name || "Guest",
+                connected: true
+            };
+        } else {
             const guestId = `guest_${Math.random().toString(36).substring(2, 9)}`;
             const guestName = `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
-            req.session.user = {
+            user = {
                 id: guestId as any,
-                name: guestName
+                name: guestName,
+                connected: true
             };
+            req.session.user = user;
         }
-        const user: User = {
-            id: req.session.user.id,
-            name: req.session.user.name || "Guest",
-            connected: true
-        };
+
         const unlisted: boolean = req.body.unlisted ?? false;
 
         let code = generateThematicRoomCode();

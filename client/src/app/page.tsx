@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { useRouter } from "next/navigation";
 import { API_URL } from "@/config";
+import { SessionContext } from "@/context/session";
 
 import CustomMatchModal from "@/components/home/CustomMatchModal";
 import PublicGames from "@/components/home/PublicGames/PublicGames";
@@ -32,10 +33,12 @@ const BOT_PERSONALITIES = [
 ];
 
 export default function Home() {
+    const session = useContext(SessionContext);
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<"online" | "computer" | "local">("online");
     const [quickMatchLoading, setQuickMatchLoading] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+
 
     // Handles quick matchmaking pairings
     const handleQuickMatch = async (timeControl: string) => {
@@ -50,10 +53,12 @@ export default function Home() {
                     unlisted: false,
                     side,
                     timeControl,
-                    variant: "standard"
+                    variant: "standard",
+                    user: session?.user || undefined
                 }),
                 credentials: "include"
             });
+
 
             if (res.ok) {
                 const data = await res.json();

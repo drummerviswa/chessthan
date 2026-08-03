@@ -1,12 +1,14 @@
 import { API_URL } from "@/config";
-import type { Game } from "@/types_config/index";
+import type { Game, User } from "@/types_config/index";
+
 
 export const createGame = async (
     side: string, 
     unlisted: boolean, 
     variant?: string,
     timeControl?: string,
-    rated?: boolean
+    rated?: boolean,
+    user?: User
 ) => {
     try {
         const res = await fetch(`${API_URL}/v1/games`, {
@@ -15,7 +17,7 @@ export const createGame = async (
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ side, unlisted, variant, timeControl, rated }),
+            body: JSON.stringify({ side, unlisted, variant, timeControl, rated, user }),
             cache: "no-store"
         });
 
@@ -27,6 +29,7 @@ export const createGame = async (
         console.error(err);
     }
 };
+
 
 export const fetchActiveGame = async (code: string) => {
     try {
