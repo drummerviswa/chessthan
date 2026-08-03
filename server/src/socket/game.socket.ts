@@ -6,11 +6,12 @@ import GameModel, { activeGames } from "../db/models/game.model.js";
 import { io } from "../server.js";
 
 function parseTimeControl(timeControl: string | undefined): { timeMs: number; incrementMs: number } | null {
-    if (!timeControl) return null;
-    const match = timeControl.match(/(\d+)(?:\+(\d+))?\s*min/i);
+    if (!timeControl || timeControl.toLowerCase().includes("casual")) return null;
+    const match = timeControl.match(/(\d+)(?:\+|\||:)?(\d+)?/);
     if (!match) return null;
     const baseMin = parseInt(match[1]);
     const incSec = match[2] ? parseInt(match[2]) : 0;
+    if (isNaN(baseMin) || baseMin <= 0) return null;
     return {
         timeMs: baseMin * 60 * 1000,
         incrementMs: incSec * 1000

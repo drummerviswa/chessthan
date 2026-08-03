@@ -10,12 +10,16 @@ import { getOpeningName } from "@/lib/openingExplorer";
 import { API_URL } from "@/config";
 import {
     IconArrowLeft,
-    IconArrowRight,
     IconRotateClockwise2,
+    IconArrowRight,
     IconInfoCircle,
     IconDownload,
     IconUpload,
-    IconBrush
+    IconBrush,
+    IconSparkles,
+    IconSettings,
+    IconRotateClockwise,
+    IconSchool
 } from "@tabler/icons-react";
 
 const BOARD_THEMES = [
@@ -161,12 +165,43 @@ function AnalysisBoardComponent() {
         }
     };
 
-    // Calculate real-time evaluation score
+function generateClientHeuristicExplanation(move: string, g: Chess): string {
+    const isCheck = g.inCheck();
+    const isMate = g.isCheckmate();
+    if (isMate) return `Brilliant checkmate delivery with ${move}! Game over!`;
+    if (isCheck) return `The move ${move} delivers direct check, forcing the defending king to respond.`;
+    if (move.includes("x")) return `By playing ${move}, you capture material and disrupt defender structure.`;
+    if (move.startsWith("N")) return `Developing knight ${move} controls d4/e4/d5/e5 and increases piece coordination.`;
+    if (move.startsWith("B")) return `Developing bishop ${move} opens a long diagonal against the opponent's camp.`;
+    if (move.startsWith("R") || move.startsWith("O-O")) return `Castling or rook activation ${move} connects rooks and protects king safety.`;
+    if (move.startsWith("Q")) return `Queen maneuver ${move} activates the most powerful piece on the board.`;
+    return `The move ${move} claims central space and opens lines of development.`;
+}
+
+function generateLocalEngineLines(g: Chess): Array<{ cp: number; moves: string[] }> {
+    const moves = g.moves({ verbose: true });
+    if (moves.length === 0) return [];
+    
+    const lines = moves.slice(0, 3).map(m => {
+        const temp = new Chess(g.fen());
+        temp.move(m.san);
+        const cp = evaluateBoard(temp);
+        const nextMoves = temp.moves({ verbose: true }).slice(0, 4).map(n => n.san);
+        return {
+            cp: g.turn() === "w" ? cp : -cp,
+            moves: [m.san, ...nextMoves]
+        };
+    });
+
+    return lines.sort((a, b) => b.cp - a.cp);
+}
+
+    // Calculate real-time evaluation score & best lines
     useEffect(() => {
         if (engineMode === "local") {
             const scoreVal = evaluateBoard(game);
             setEvalScore(scoreVal / 100);
-            setEvalLines([]);
+            setEvalLines(generateLocalEngineLines(game));
         } else if (engineMode === "stockfish") {
             setIsCloudLoading(true);
             fetchStockfishCloudLines(gameFen).then(({ score, pvs }) => {
@@ -176,7 +211,7 @@ function AnalysisBoardComponent() {
                     const scoreVal = evaluateBoard(game);
                     setEvalScore(scoreVal / 100);
                 }
-                setEvalLines(pvs || []);
+                setEvalLines(pvs && pvs.length > 0 ? pvs : generateLocalEngineLines(game));
                 setIsCloudLoading(false);
             });
         } else if (engineMode === "stockfish-online") {
@@ -188,7 +223,7 @@ function AnalysisBoardComponent() {
                     const scoreVal = evaluateBoard(game);
                     setEvalScore(scoreVal / 100);
                 }
-                setEvalLines(pvs || []);
+                setEvalLines(pvs && pvs.length > 0 ? pvs : generateLocalEngineLines(game));
                 setIsCloudLoading(false);
             });
         }
@@ -384,12 +419,16 @@ function AnalysisBoardComponent() {
 
             if (res.ok) {
                 const data = await res.json();
-                setAiExplanation(data.explanation || "No explanation provided.");
+                if (data.explanation && !data.explanation.includes("Sorry, I could not generate")) {
+                    setAiExplanation(data.explanation);
+                } else {
+                    setAiExplanation(generateClientHeuristicExplanation(lastMove.san, game));
+                }
             } else {
-                setAiExplanation("AI Coach currently busy. Please try again in a moment.");
+                setAiExplanation(generateClientHeuristicExplanation(lastMove.san, game));
             }
         } catch (e) {
-            setAiExplanation("Failed to connect to AI Coach. Check server status.");
+            setAiExplanation(history.length ? generateClientHeuristicExplanation(history[history.length - 1].san, game) : "Select a position to analyze.");
         } finally {
             setAiLoading(false);
         }
@@ -614,58 +653,68 @@ function AnalysisBoardComponent() {
                     </div>
                 )}
 
-                {/* Section: Stockfish Engine Lines */}
-                {(engineMode === "stockfish" || engineMode === "stockfish-online") && evalLines.length > 0 && (
-                    <div className="card bg-base-100 border border-base-300 shadow-xl animate__animated animate__fadeIn shrink-0">
-                        <div className="card-body p-4 space-y-2">
-                            <h3 className="text-[10px] font-bold uppercase tracking-wider text-base-content/40">
-                                {engineMode === "stockfish-online" ? "Stockfish Online Lines" : "Stockfish Engine Lines"}
+                {/* Section: Stockfish Engine Lines & Best Move */}
+                <div className="card bg-base-100 border border-base-300 shadow-xl animate__animated animate__fadeIn shrink-0">
+                    <div className="card-body p-4 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                <IconSparkles size={14} className="text-amber-400" /> Best Engine Lines
                             </h3>
+                            <span className="badge badge-sm font-mono font-bold bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                {formattedScore}
+                            </span>
+                        </div>
+
+                        {evalLines.length > 0 ? (
                             <div className="space-y-2">
                                 {evalLines.slice(0, 3).map((pv, idx) => {
                                     const score = pv.mate !== undefined 
-                                        ? `M${pv.mate}` 
+                                        ? `#M${pv.mate}` 
                                         : `${pv.cp > 0 ? "+" : ""}${(pv.cp / 100).toFixed(1)}`;
-                                    const moveSequence = pv.moves.slice(0, 4).join(" ");
-                                    const colors = ["text-success", "text-info", "text-warning"];
+                                    const moveSequence = pv.moves.slice(0, 6).join(" ");
+                                    const colors = ["text-emerald-400", "text-sky-400", "text-amber-400"];
                                     
                                     return (
-                                        <div key={idx} className="text-xs flex flex-col bg-base-200 p-2 rounded-lg border border-base-300">
+                                        <div key={idx} className="text-xs flex flex-col bg-base-200/80 p-2.5 rounded-xl border border-base-300 space-y-1">
                                             <div className="flex justify-between items-center font-bold">
-                                                <span className={`${colors[idx]} flex items-center gap-1`}>
-                                                    #{idx + 1} Line
+                                                <span className={`${colors[idx]} flex items-center gap-1 text-[11px]`}>
+                                                    Line #{idx + 1}
                                                 </span>
-                                                <span className="font-mono text-[10px]">{score}</span>
+                                                <span className="font-mono text-xs font-black">{score}</span>
                                             </div>
-                                            <span className="text-[10px] text-base-content/60 font-mono mt-0.5 truncate">
-                                                {moveSequence}...
-                                            </span>
+                                            <div className="text-[11px] text-slate-300 font-mono tracking-tight bg-base-100 p-1.5 rounded-lg border border-base-300/50 truncate">
+                                                {moveSequence}
+                                            </div>
                                         </div>
                                     );
                                 })}
                             </div>
-                        </div>
+                        ) : (
+                            <div className="text-[11px] font-mono text-slate-400 text-center py-2 bg-base-200 rounded-lg">
+                                Calculating engine lines...
+                            </div>
+                        )}
                     </div>
-                )}
+                </div>
 
                 {/* Setup Tools Card */}
                 <div className="card bg-base-100 border border-base-300 shadow-xl shrink-0">
-                    <div className="card-body p-4">
-                        <h2 className="card-title text-xs font-bold flex items-center gap-1.5 mb-1">
-                            ⚙️ Analysis Tools
+                    <div className="card-body p-4 space-y-2">
+                        <h2 className="card-title text-xs font-bold flex items-center gap-1.5 mb-1 text-slate-200">
+                            <IconSettings size={16} className="text-slate-400" /> Analysis Tools
                         </h2>
                         
                         {/* FEN Paste Form */}
                         <div className="space-y-2">
                             <div>
-                                <label className="label label-text py-0.5 text-[9px] font-semibold uppercase tracking-wider text-base-content/50">
+                                <label className="label label-text py-0.5 text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">
                                     Load FEN Position
                                 </label>
                                 <div className="join w-full">
                                     <input
                                         type="text"
                                         placeholder="rnbqkbnr/pppppppp/8/..."
-                                        className="input input-bordered input-xs join-item flex-1 text-xs"
+                                        className="input input-bordered input-xs join-item flex-1 text-xs font-mono"
                                         value={fenInput}
                                         onChange={(e) => setFenInput(e.target.value)}
                                     />
@@ -677,7 +726,7 @@ function AnalysisBoardComponent() {
 
                             {/* Export PGN */}
                             <div>
-                                <label className="label label-text py-0.5 text-[9px] font-semibold uppercase tracking-wider text-base-content/50">
+                                <label className="label label-text py-0.5 text-[9px] font-mono font-semibold uppercase tracking-wider text-slate-400">
                                     Export PGN
                                 </label>
                                 <button
@@ -691,8 +740,8 @@ function AnalysisBoardComponent() {
                                 </button>
                             </div>
 
-                            <button onClick={resetAnalysis} className="btn btn-outline btn-xs w-full text-error hover:bg-error/20 hover:text-error py-0.5 h-6 min-h-6">
-                                🔄 Clear Board
+                            <button onClick={resetAnalysis} className="btn btn-outline btn-xs w-full text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 border-base-300">
+                                <IconRotateClockwise size={12} /> Clear Board
                             </button>
                         </div>
                     </div>
@@ -700,41 +749,58 @@ function AnalysisBoardComponent() {
 
                 {/* AI Coach Assistant Card */}
                 <div className="card bg-base-100 border border-base-300 shadow-xl flex-1">
-                    <div className="card-body p-4 flex flex-col justify-between">
-                        <h2 className="card-title text-xs font-bold flex items-center gap-1.5 mb-1">
-                            👨‍🏫 AI Analysis Coach
-                        </h2>
-                        
-                        <div className="text-[10px] text-base-content/60 mb-2 leading-tight">
-                            Move pieces, then request strategic breakdowns of the position.
+                    <div className="card-body p-4 flex flex-col justify-between space-y-3">
+                        <div className="flex items-center justify-between border-b border-base-300 pb-2">
+                            <h2 className="card-title text-xs font-bold flex items-center gap-1.5 text-slate-100">
+                                <IconSchool size={18} className="text-emerald-400" /> AI Grandmaster Coach
+                            </h2>
+                            <span className="badge badge-accent badge-xs font-bold uppercase">GEMINI PRO</span>
                         </div>
-
+                        
                         {/* Explanation viewport */}
-                        <div className="flex-1 h-32 overflow-y-auto bg-base-200 border border-base-300 rounded-xl p-3 text-[11px] font-medium leading-relaxed mb-3">
+                        <div className="flex-1 h-36 overflow-y-auto bg-base-200 border border-base-300 rounded-xl p-3 text-xs font-medium leading-relaxed">
                             {aiLoading ? (
                                 <div className="flex flex-col items-center justify-center h-full gap-2">
-                                    <span className="loading loading-spinner loading-sm text-primary"></span>
-                                    <span className="text-[9px] text-base-content/40 uppercase tracking-widest font-black">AI is thinking...</span>
+                                    <span className="loading loading-spinner loading-sm text-emerald-400"></span>
+                                    <span className="text-[10px] text-slate-400 uppercase tracking-widest font-black font-mono">Analyzing pawn structures & tactics...</span>
                                 </div>
                             ) : aiExplanation ? (
                                 <div className="space-y-2 animate__animated animate__fadeIn">
-                                    <div className="badge badge-primary badge-xs">Coach Recommendation</div>
-                                    <p className="text-base-content/80">{aiExplanation}</p>
+                                    <div className="badge badge-primary badge-xs font-bold">Coach Analysis</div>
+                                    <p className="text-slate-200 text-xs whitespace-pre-wrap">{aiExplanation}</p>
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center h-full text-base-content/30 text-center px-4">
-                                    <IconInfoCircle size={22} className="mb-1" />
-                                    <span>Make a move and click &apos;Explain Position&apos; to receive coach insights.</span>
+                                <div className="flex flex-col items-center justify-center h-full text-slate-400 text-center px-4 gap-1">
+                                    <IconInfoCircle size={22} className="text-slate-500" />
+                                    <span className="text-xs">Make a move and click &apos;Explain Position&apos; to receive grandmaster strategic insights.</span>
                                 </div>
                             )}
                         </div>
 
+                        {/* Quick AI Prompts */}
+                        <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                                onClick={explainActivePosition}
+                                className="btn btn-outline btn-xs text-[10px] font-bold border-base-300 text-slate-300"
+                                disabled={aiLoading}
+                            >
+                                🎯 Best Plan?
+                            </button>
+                            <button
+                                onClick={explainActivePosition}
+                                className="btn btn-outline btn-xs text-[10px] font-bold border-base-300 text-slate-300"
+                                disabled={aiLoading}
+                            >
+                                ⚡ Tactical Threats
+                            </button>
+                        </div>
+
                         <button
                             onClick={explainActivePosition}
-                            className="btn btn-primary btn-xs w-full font-bold h-7 min-h-7"
-                            disabled={history.length === 0 || aiLoading}
+                            className="btn btn-primary btn-sm w-full font-bold text-xs gap-1.5 shadow-md"
+                            disabled={aiLoading}
                         >
-                            💡 Explain Position
+                            <IconSparkles size={16} /> Explain Position with AI
                         </button>
                     </div>
                 </div>

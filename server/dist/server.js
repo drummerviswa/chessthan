@@ -7,7 +7,8 @@ import { INIT_TABLES, db } from "./db/index.js";
 import session from "./middleware/session.js";
 import routes from "./routes/index.js";
 import { init as initSocket } from "./socket/index.js";
-const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
+const allowedOrigins = (process.env.CORS_ORIGIN ||
+    "http://localhost:3000,http://127.0.0.1:3000,https://chessthan.vercel.app")
     .split(",")
     .map((origin) => origin.trim().replace(/\/$/, ""));
 const corsConfig = {

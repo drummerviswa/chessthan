@@ -5,6 +5,7 @@ import check from "public/check.json";
 
 import {
   IconCopy,
+  IconClock
 } from "@tabler/icons-react";
 
 import type { FormEvent, KeyboardEvent } from "react";
@@ -75,14 +76,14 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   }, [lobby.clocks, lobby.winner, lobby.endReason, lobby.white, lobby.black, lobby.actualGame]);
 
   function formatClockTime(ms: number) {
-    if (ms <= 0) return "0:00";
+    if (ms <= 0) return "0:00.0";
     const totalSecs = Math.floor(ms / 1000);
     const mins = Math.floor(totalSecs / 60);
     const secs = totalSecs % 60;
 
     if (ms < 10000) {
       const tenths = Math.floor((ms % 1000) / 100);
-      return `${secs}.${tenths}`;
+      return `${mins}:${secs < 10 ? "0" : ""}${secs}.${tenths}`;
     }
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   }
@@ -107,7 +108,8 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   const [boardTheme, setBoardTheme] = useState({ dark: "#0e4a3b", light: "#eeeddf" });
 
   const [evalScore, setEvalScore] = useState<number>(0);
-  const showEval = true;
+  // Hide evaluation bar & engine suggestions during ongoing competitive online matches
+  const showEval = !!(lobby.endReason || lobby.winner);
 
   const [premoveQueue, setPremoveQueue] = useState<{ from: string; to: string; promotion?: string }[]>([]);
   const [flipBoard, setFlipBoard] = useState(false);
@@ -640,11 +642,14 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
 
         {/* Clock badge */}
         {clocks && (
-          <div className={`px-3 py-1.5 rounded-lg font-mono text-sm font-black tracking-wider ${
-            lobby.actualGame.turn() === "b" && !lobby.winner && !lobby.endReason
-              ? "bg-primary text-primary-content animate-pulse ring-2 ring-primary/40 shadow-lg"
-              : "bg-base-300 text-base-content/70"
+          <div className={`px-3.5 py-1.5 rounded-xl font-mono text-sm font-black tracking-wider transition-all shadow-md flex items-center gap-1.5 ${
+            clocks.black < 20000 && lobby.actualGame.turn() === "b" && !lobby.winner && !lobby.endReason
+              ? "bg-rose-950 border border-rose-600 text-rose-300 animate-pulse ring-2 ring-rose-500/50"
+              : lobby.actualGame.turn() === "b" && !lobby.winner && !lobby.endReason
+              ? "bg-emerald-600 text-white animate-pulse ring-2 ring-emerald-500/40 shadow-lg"
+              : "bg-base-300 text-slate-300 border border-base-300/80"
           }`}>
+            <IconClock size={14} className={lobby.actualGame.turn() === "b" ? "text-amber-400 animate-spin" : "opacity-40"} />
             {formatClockTime(clocks.black)}
           </div>
         )}
@@ -680,11 +685,14 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
 
         {/* Clock badge */}
         {clocks && (
-          <div className={`px-3 py-1.5 rounded-lg font-mono text-sm font-black tracking-wider ${
-            lobby.actualGame.turn() === "w" && !lobby.winner && !lobby.endReason
-              ? "bg-primary text-primary-content animate-pulse ring-2 ring-primary/40 shadow-lg"
-              : "bg-base-300 text-base-content/70"
+          <div className={`px-3.5 py-1.5 rounded-xl font-mono text-sm font-black tracking-wider transition-all shadow-md flex items-center gap-1.5 ${
+            clocks.white < 20000 && lobby.actualGame.turn() === "w" && !lobby.winner && !lobby.endReason
+              ? "bg-rose-950 border border-rose-600 text-rose-300 animate-pulse ring-2 ring-rose-500/50"
+              : lobby.actualGame.turn() === "w" && !lobby.winner && !lobby.endReason
+              ? "bg-emerald-600 text-white animate-pulse ring-2 ring-emerald-500/40 shadow-lg"
+              : "bg-base-300 text-slate-300 border border-base-300/80"
           }`}>
+            <IconClock size={14} className={lobby.actualGame.turn() === "w" ? "text-amber-400 animate-spin" : "opacity-40"} />
             {formatClockTime(clocks.white)}
           </div>
         )}
