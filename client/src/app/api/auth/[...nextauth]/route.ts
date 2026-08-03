@@ -7,6 +7,11 @@ if (process.env.NODE_ENV !== "production") {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 
+const getApiUrl = () =>
+  process.env.API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://chessthan.onrender.com";
+
 const handler = NextAuth({
   providers: [
     GoogleProvider({
@@ -25,7 +30,8 @@ const handler = NextAuth({
       },
       async authorize(credentials) {
         try {
-          const res = await fetch(`${process.env.API_URL}/v1/auth/login`, {
+          const apiUrl = getApiUrl();
+          const res = await fetch(`${apiUrl}/v1/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -54,7 +60,8 @@ const handler = NextAuth({
     async signIn({ user, account }) {
       if (account?.provider === "google" || account?.provider === "github") {
         try {
-          const res = await fetch(`${process.env.API_URL}/v1/auth/oauth`, {
+          const apiUrl = getApiUrl();
+          const res = await fetch(`${apiUrl}/v1/auth/oauth`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -63,6 +70,7 @@ const handler = NextAuth({
               avatarUrl: user.image
             })
           });
+
           if (res.ok) {
             const dbUser = await res.json();
             user.id = dbUser.id;
@@ -74,12 +82,15 @@ const handler = NextAuth({
             (user as any).avatarUrl = dbUser.avatarUrl;
             (user as any).subscriptionStatus = dbUser.subscriptionStatus;
             (user as any).puzzleRating = dbUser.puzzleRating;
-            return true;
+          } else {
+            console.warn("Backend OAuth sync non-200, proceeding with OAuth profile:", res.status);
+            user.id = user.id || `oauth_${Date.now()}`;
           }
-          return false;
+          return true;
         } catch (e) {
           console.error("OAuth database sync error:", e);
-          return false;
+          user.id = user.id || `oauth_${Date.now()}`;
+          return true;
         }
       }
       return true;
