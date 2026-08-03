@@ -297,35 +297,32 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   ]);
 
   useEffect(() => {
-    const userToUse = (session?.user && session.user?.id) ? session.user : {
-      id: `guest_${Math.random().toString(36).substring(2, 9)}`,
-      name: `Guest_${Math.floor(1000 + Math.random() * 9000)}`
+    const handleResize = () => {
+      const maxHeightBased = Math.floor(window.innerHeight * 0.70);
+      let targetWidth = 480;
+      if (window.innerWidth >= 1920) targetWidth = 580;
+      else if (window.innerWidth >= 1536) targetWidth = 540;
+      else if (window.innerWidth >= 768) targetWidth = 480;
+      else targetWidth = 330;
+      setBoardWidth(Math.min(targetWidth, maxHeightBased));
     };
 
     socket.connect();
-
     window.addEventListener("resize", handleResize);
     handleResize();
 
     if (lobby.pgn && lobby.actualGame.pgn() !== lobby.pgn) {
-      syncPgn(lobby.pgn, lobby, {
-        updateCustomSquares,
-        setNavFen,
-        setNavIndex,
-      });
+      syncPgn(lobby.pgn, lobby, { updateCustomSquares, setNavFen, setNavIndex });
     }
 
-    syncSide(userToUse, undefined, lobby, { updateLobby });
-
-    initSocket(userToUse, socket, lobby, {
-      updateLobby,
-      addMessage,
-      updateCustomSquares,
-      makeMove,
-      setNavFen,
-      setNavIndex,
-      setDrawOfferFrom,
-    });
+    initSocket(
+      // Pass a live getter so the socket callbacks always see the current user
+      // (avoids stale closure capturing undefined session at mount time)
+      () => session?.user ?? null,
+      socket,
+      lobby,
+      { updateLobby, addMessage, updateCustomSquares, makeMove, setNavFen, setNavIndex, setDrawOfferFrom }
+    );
 
     return () => {
       window.removeEventListener("resize", handleResize);
@@ -334,6 +331,15 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-run syncSide whenever session resolves (handles late-loading guest sessions)
+  useEffect(() => {
+    if (!session?.user) return;
+    syncSide(session.user, undefined, lobby, { updateLobby });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]);
+
+
 
   // auto scroll down when new message is added
   useEffect(() => {
@@ -365,23 +371,6 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     }
   }
 
-  function handleResize() {
-    const maxHeightBased = Math.floor(window.innerHeight * 0.70);
-    let targetWidth = 480;
-
-    if (window.innerWidth >= 1920) {
-      targetWidth = 580;
-    } else if (window.innerWidth >= 1536) {
-      targetWidth = 540;
-    } else if (window.innerWidth >= 768) {
-      targetWidth = 480;
-    } else {
-      targetWidth = 330;
-    }
-
-    const finalWidth = Math.min(targetWidth, maxHeightBased);
-    setBoardWidth(finalWidth);
-  }
 
   function addMessage(message: Message) {
     setChatMessages((prev) => [...prev, message]);

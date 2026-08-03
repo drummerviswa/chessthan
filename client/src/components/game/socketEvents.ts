@@ -6,7 +6,7 @@ import type { Socket } from "socket.io-client";
 import { syncPgn, syncSide } from "./utils";
 
 export function initSocket(
-    user: User,
+    getUser: () => User | null | undefined,
     socket: Socket,
     lobby: Lobby,
     actions: {
@@ -37,7 +37,11 @@ export function initSocket(
         }
         actions.updateLobby({ type: "updateLobby", payload: latestGame });
 
-        syncSide(user, latestGame, lobby, actions);
+        // Get the live user at event-fire time (not the stale mount-time snapshot)
+        const user = getUser();
+        if (user) {
+            syncSide(user, latestGame, lobby, actions);
+        }
     });
 
     socket.on("receivedMove", (m: { from: string; to: string; promotion?: string }) => {
