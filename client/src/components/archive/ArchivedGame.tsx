@@ -16,9 +16,11 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { Chessboard } from "react-chessboard";
 import { API_URL } from "@/config";
 import { getOpeningName } from "@/lib/openingExplorer";
+import { evaluateBoard } from "@/lib/localEngine";
 
 export default function ArchivedGame({ game }: { game: Game }) {
   const [boardWidth, setBoardWidth] = useState(480);
+  const [boardTheme, setBoardTheme] = useState({ dark: "#0e4a3b", light: "#eeeddf" });
   const moveListRef = useRef<HTMLDivElement>(null);
   const [navFen, setNavFen] = useState<string | null>(null);
   const [navIndex, setNavIndex] = useState<number | null>(null);
@@ -29,6 +31,92 @@ export default function ArchivedGame({ game }: { game: Game }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [gameReview, setGameReview] = useState<string | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
+
+  interface MoveAnalysis {
+    san: string;
+    grade: "brilliant" | "best" | "good" | "inaccuracy" | "mistake" | "blunder";
+    evalBefore: number;
+    evalAfter: number;
+    diff: number;
+  }
+
+  const [accuracyResults, setAccuracyResults] = useState<{
+    whiteAccuracy: number;
+    blackAccuracy: number;
+    whiteCounts: { brilliant: number; best: number; good: number; inaccuracy: number; mistake: number; blunder: number };
+    blackCounts: { brilliant: number; best: number; good: number; inaccuracy: number; mistake: number; blunder: number };
+    movesList: MoveAnalysis[];
+  } | null>(null);
+  const [analyzingAccuracy, setAnalyzingAccuracy] = useState(false);
+
+  const runAccuracyAnalysis = () => {
+    setAnalyzingAccuracy(true);
+    setTimeout(() => {
+      const history = actualGame.history({ verbose: true });
+      const movesList: MoveAnalysis[] = [];
+      
+      const whiteCounts = { brilliant: 0, best: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 0 };
+      const blackCounts = { brilliant: 0, best: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 0 };
+      
+      for (let i = 0; i < history.length; i++) {
+        const currentMove = history[i];
+        const scoreBefore = evaluateBoard(new Chess(currentMove.before)) / 100;
+        const scoreAfter = evaluateBoard(new Chess(currentMove.after)) / 100;
+        
+        const diff = currentMove.color === "w" ? (scoreAfter - scoreBefore) : (scoreBefore - scoreAfter);
+        
+        let grade: MoveAnalysis["grade"] = "good";
+        if (diff >= 1.0) {
+          grade = "brilliant";
+        } else if (diff >= -0.05) {
+          grade = "best";
+        } else if (diff >= -0.2) {
+          grade = "good";
+        } else if (diff >= -0.5) {
+          grade = "inaccuracy";
+        } else if (diff >= -1.5) {
+          grade = "mistake";
+        } else {
+          grade = "blunder";
+        }
+        
+        if (currentMove.color === "w") {
+          whiteCounts[grade]++;
+        } else {
+          blackCounts[grade]++;
+        }
+        
+        movesList.push({
+          san: currentMove.san,
+          grade,
+          evalBefore: scoreBefore,
+          evalAfter: scoreAfter,
+          diff
+        });
+      }
+      
+      const getAccuracyScore = (counts: typeof whiteCounts, total: number) => {
+        if (total === 0) return 100;
+        let points = 0;
+        points += (counts.brilliant + counts.best + counts.good) * 100;
+        points += counts.inaccuracy * 50;
+        points += counts.mistake * 20;
+        return Math.round(points / total);
+      };
+      
+      const whiteTotal = Math.ceil(history.length / 2);
+      const blackTotal = Math.floor(history.length / 2);
+      
+      setAccuracyResults({
+        whiteAccuracy: getAccuracyScore(whiteCounts, whiteTotal),
+        blackAccuracy: getAccuracyScore(blackCounts, blackTotal),
+        whiteCounts,
+        blackCounts,
+        movesList
+      });
+      setAnalyzingAccuracy(false);
+    }, 100);
+  };
   const actualGame = new Chess();
   actualGame.loadPgn(game.pgn as string);
 
@@ -111,15 +199,21 @@ export default function ArchivedGame({ game }: { game: Game }) {
   );
 
   function handleResize() {
+    const maxHeightBased = Math.floor(window.innerHeight * 0.70);
+    let targetWidth = 480;
+
     if (window.innerWidth >= 1920) {
-      setBoardWidth(580);
+      targetWidth = 580;
     } else if (window.innerWidth >= 1536) {
-      setBoardWidth(540);
+      targetWidth = 540;
     } else if (window.innerWidth >= 768) {
-      setBoardWidth(480);
+      targetWidth = 480;
     } else {
-      setBoardWidth(250);
+      targetWidth = 330;
     }
+
+    const finalWidth = Math.min(targetWidth, maxHeightBased);
+    setBoardWidth(finalWidth);
   }
 
   // auto scroll for moves
@@ -134,10 +228,51 @@ export default function ArchivedGame({ game }: { game: Game }) {
     handleResize();
     window.addEventListener("resize", handleResize);
 
+    const savedTheme = localStorage.getItem("chessthan:boardTheme");
+    if (savedTheme) {
+      const THEMES = [
+        { id: "emerald", dark: "#0e4a3b", light: "#eeeddf" },
+        { id: "wood", dark: "#b58863", light: "#f0d9b5" },
+        { id: "glass", dark: "#5e81ac", light: "#eceff4" },
+        { id: "slate", dark: "#475569", light: "#cbd5e1" },
+        { id: "royal", dark: "#5b21b6", light: "#ede9fe" }
+      ];
+      const found = THEMES.find(t => t.id === savedTheme);
+      if (found) {
+        setBoardTheme({ dark: found.dark, light: found.light });
+      }
+    }
+
     return () => {
       window.removeEventListener("resize", handleResize);
     };
   }, []);
+
+  // Keyboard Navigation Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: any) => {
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        navigateMove(navIndex === null ? "prev" : navIndex - 1);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        navigateMove(navIndex === null ? null : navIndex + 1);
+      } else if (e.key === " ") {
+        e.preventDefault();
+        setFlipBoard((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [navIndex, actualGame, navigateMove]);
 
   function copyLink() {
     const text = `https://chessthan.vercel.app/archive/${game.id}`;
@@ -297,8 +432,8 @@ export default function ArchivedGame({ game }: { game: Game }) {
       <div className="h-min">
         <Chessboard
           boardWidth={boardWidth}
-          customDarkSquareStyle={{ backgroundColor: "#4b7399" }}
-          customLightSquareStyle={{ backgroundColor: "#eae9d2" }}
+          customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
+          customLightSquareStyle={{ backgroundColor: boardTheme.light }}
           position={navFen || actualGame.fen()}
           boardOrientation={flipBoard ? "black" : "white"}
           isDraggablePiece={() => false}
@@ -406,8 +541,24 @@ export default function ArchivedGame({ game }: { game: Game }) {
           ) : (
             <div className="space-y-3">
               <div className="text-xs flex justify-between items-center">
-                <span>
+                <span className="flex items-center gap-1.5">
                   Selected Move: <span className="font-bold text-primary">{actualGame.history({ verbose: true })[navIndex].san}</span>
+                  {accuracyResults && accuracyResults.movesList[navIndex] && (
+                    <span className={`badge badge-xs uppercase font-extrabold px-1.5 py-0.5 ${
+                      accuracyResults.movesList[navIndex].grade === "brilliant" ? "badge-warning" :
+                      accuracyResults.movesList[navIndex].grade === "best" ? "badge-success" :
+                      accuracyResults.movesList[navIndex].grade === "good" ? "badge-info" :
+                      accuracyResults.movesList[navIndex].grade === "inaccuracy" ? "badge-neutral" :
+                      accuracyResults.movesList[navIndex].grade === "mistake" ? "badge-error text-error-content" :
+                      "bg-rose-600 text-white"
+                    }`}>
+                      {accuracyResults.movesList[navIndex].grade === "brilliant" ? "🌟 Brilliant" :
+                       accuracyResults.movesList[navIndex].grade === "best" ? "✅ Best" :
+                       accuracyResults.movesList[navIndex].grade === "good" ? "👍 Good" :
+                       accuracyResults.movesList[navIndex].grade === "inaccuracy" ? "⚠️ Inaccuracy" :
+                       accuracyResults.movesList[navIndex].grade === "mistake" ? "❌ Mistake" : "🛑 Blunder"}
+                    </span>
+                  )}
                 </span>
                 <span className="text-[10px] text-base-content/50">
                   {actualGame.history({ verbose: true })[navIndex].color === "w" ? "White's turn" : "Black's turn"}
@@ -469,6 +620,83 @@ export default function ArchivedGame({ game }: { game: Game }) {
               onFocus={(e) => e.target.select()}
             />
           </div>
+        </div>
+
+        {/* Move Accuracy review panel */}
+        <div className="card w-full bg-base-300 shadow-sm rounded-lg p-4 border border-base-200 mt-1">
+          <h3 className="font-bold text-xs uppercase tracking-wider text-base-content/50 mb-2 flex items-center gap-1.5">
+            📊 Move Accuracy Review
+          </h3>
+          {accuracyResults ? (
+            <div className="space-y-4 animate__animated animate__fadeIn">
+              
+              {/* Accuracy scores cards */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-base-100 p-3 rounded-xl border border-base-200 text-center">
+                  <div className="text-[9px] uppercase font-bold text-base-content/50">⚪ White Accuracy</div>
+                  <div className="text-2xl font-black text-primary mt-1">{accuracyResults.whiteAccuracy}%</div>
+                </div>
+                <div className="bg-base-100 p-3 rounded-xl border border-base-200 text-center">
+                  <div className="text-[9px] uppercase font-bold text-base-content/50">⚫ Black Accuracy</div>
+                  <div className="text-2xl font-black text-accent mt-1">{accuracyResults.blackAccuracy}%</div>
+                </div>
+              </div>
+
+              {/* Counts table breakdown */}
+              <div className="overflow-x-auto bg-base-100 rounded-xl border border-base-200 p-2">
+                <table className="table table-compact w-full text-[10px]">
+                  <thead>
+                    <tr>
+                      <th>Move Quality</th>
+                      <th className="text-center">White</th>
+                      <th className="text-center">Black</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="font-bold text-warning">🌟 Brilliant</td>
+                      <td className="text-center font-bold">{accuracyResults.whiteCounts.brilliant}</td>
+                      <td className="text-center font-bold">{accuracyResults.blackCounts.brilliant}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-bold text-success">✅ Best Move</td>
+                      <td className="text-center font-bold">{accuracyResults.whiteCounts.best}</td>
+                      <td className="text-center font-bold">{accuracyResults.blackCounts.best}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-bold text-info">👍 Good</td>
+                      <td className="text-center font-bold">{accuracyResults.whiteCounts.good}</td>
+                      <td className="text-center font-bold">{accuracyResults.blackCounts.good}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-bold text-base-content/60">⚠️ Inaccuracy</td>
+                      <td className="text-center font-bold">{accuracyResults.whiteCounts.inaccuracy}</td>
+                      <td className="text-center font-bold">{accuracyResults.blackCounts.inaccuracy}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-bold text-error">❌ Mistake</td>
+                      <td className="text-center font-bold">{accuracyResults.whiteCounts.mistake}</td>
+                      <td className="text-center font-bold">{accuracyResults.blackCounts.mistake}</td>
+                    </tr>
+                    <tr>
+                      <td className="font-bold text-rose-600">🛑 Blunder</td>
+                      <td className="text-center font-bold">{accuracyResults.whiteCounts.blunder}</td>
+                      <td className="text-center font-bold">{accuracyResults.blackCounts.blunder}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          ) : (
+            <button
+              onClick={runAccuracyAnalysis}
+              className={`btn btn-xs btn-primary w-full ${analyzingAccuracy ? "loading animate-pulse" : ""}`}
+              disabled={analyzingAccuracy}
+            >
+              📋 Run Move Accuracy Review
+            </button>
+          )}
         </div>
 
         {/* Full Game Summary Card */}

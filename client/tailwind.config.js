@@ -14,32 +14,32 @@ module.exports = {
         themes: [
             {
                 chessuLight: {
-                    primary: "#0070F3",
-                    secondary: "#3B82F6",
-                    accent: "#F59E0B",
-                    neutral: "#334155",
+                    primary: "#059669",
+                    secondary: "#2563EB",
+                    accent: "#D97706",
+                    neutral: "#1E293B",
                     "base-100": "#F8FAFC",
                     "base-200": "#F1F5F9",
-                    "base-300": "#E2E8F0",
+                    "base-300": "#CBD5E1",
                     "base-content": "#0F172A",
-                    info: "#06B6D4",
-                    success: "#10B981",
-                    warning: "#F59E0B",
-                    error: "#EF4444"
+                    info: "#0284C7",
+                    success: "#059669",
+                    warning: "#D97706",
+                    error: "#DC2626"
                 },
                 chessuDark: {
-                    primary: "#3B82F6",
-                    secondary: "#60A5FA",
-                    accent: "#F59E0B",
-                    neutral: "#334155",
-                    "base-100": "#0F172A",
-                    "base-200": "#1E293B",
-                    "base-300": "#334155",
-                    "base-content": "#F1F5F9",
-                    info: "#06B6D4",
-                    success: "#10B981",
-                    warning: "#F59E0B",
-                    error: "#EF4444"
+                    primary: "#10b981",
+                    secondary: "#3b82f6",
+                    accent: "#f59e0b",
+                    neutral: "#1f293d",
+                    "base-100": "#090b0e",
+                    "base-200": "#121620",
+                    "base-300": "#1f293d",
+                    "base-content": "#f1f5f9",
+                    info: "#38bdf8",
+                    success: "#10b981",
+                    warning: "#f59e0b",
+                    error: "#ef4444"
                 }
             }
         ],

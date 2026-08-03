@@ -53,11 +53,46 @@ export const syncSide = (
     actions: { updateLobby: Dispatch<Action> }
 ) => {
     if (!game) game = lobby;
-    if (game.black?.id === user?.id) {
+
+    const uId = user?.id !== undefined ? String(user.id) : undefined;
+    const uName = user?.name ? String(user.name).trim().toLowerCase() : undefined;
+
+    const bId = game.black?.id !== undefined ? String(game.black.id) : undefined;
+    const bName = game.black?.name ? String(game.black.name).trim().toLowerCase() : undefined;
+
+    const wId = game.white?.id !== undefined ? String(game.white.id) : undefined;
+    const wName = game.white?.name ? String(game.white.name).trim().toLowerCase() : undefined;
+
+    const isWhiteUser = (uId && wId && uId === wId) || (uName && wName && uName === wName);
+    const isBlackUser = (uId && bId && uId === bId) || (uName && bName && uName === bName);
+
+    // 1. Direct match on Black
+    if (isBlackUser) {
         if (lobby.side !== "b") actions.updateLobby({ type: "setSide", payload: "b" });
-    } else if (game.white?.id === user?.id) {
+        return;
+    }
+
+    // 2. Direct match on White
+    if (isWhiteUser) {
         if (lobby.side !== "w") actions.updateLobby({ type: "setSide", payload: "w" });
-    } else if (lobby.side !== "s") {
-        actions.updateLobby({ type: "setSide", payload: "s" });
+        return;
+    }
+
+    // 3. Opponent auto-joining open slot:
+    // If game has White but no Black, and user is not White -> user claims Black ("b")
+    if (game.white && !game.black && !isWhiteUser) {
+        if (lobby.side !== "b") actions.updateLobby({ type: "setSide", payload: "b" });
+        return;
+    }
+
+    // If game has Black but no White, and user is not Black -> user claims White ("w")
+    if (game.black && !game.white && !isBlackUser) {
+        if (lobby.side !== "w") actions.updateLobby({ type: "setSide", payload: "w" });
+        return;
+    }
+
+    // 4. Spectator if room is full with 2 distinct players
+    if (game.white && game.black && !isWhiteUser && !isBlackUser) {
+        if (lobby.side !== "s") actions.updateLobby({ type: "setSide", payload: "s" });
     }
 };

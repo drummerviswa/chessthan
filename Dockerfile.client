@@ -1,0 +1,35 @@
+# --- Stage 1: Build ---
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY client/package.json ./client/
+
+RUN pnpm install --filter client...
+
+COPY client ./client
+
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+RUN pnpm --filter client build
+
+# --- Stage 2: Runner ---
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Copy standalone Next.js server output
+COPY --from=builder /app/client/.next/standalone ./
+COPY --from=builder /app/client/.next/static ./client/.next/static
+COPY --from=builder /app/client/public ./client/public
+
+EXPOSE 3000
+
+CMD ["node", "client/server.js"]

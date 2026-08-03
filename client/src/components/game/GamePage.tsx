@@ -4,11 +4,7 @@ import celeb from "public/celeb.json";
 import check from "public/check.json";
 
 import {
-  IconChevronLeft,
-  IconChevronRight,
   IconCopy,
-  IconPlayerSkipBack,
-  IconPlayerSkipForward,
 } from "@tabler/icons-react";
 
 import type { FormEvent, KeyboardEvent } from "react";
@@ -35,6 +31,7 @@ import Lottie from "lottie-react";
 import { playSound, triggerHaptic } from "@/lib/audioEffects";
 import GameResultModal from "./GameResultModal";
 import { evaluateBoard } from "@/lib/localEngine";
+import BoardControlPanel from "./BoardControlPanel";
 
 const socket = io(API_URL, { withCredentials: true, autoConnect: false });
 
@@ -46,6 +43,49 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     actualGame: initialLobby.initialFen ? new Chess(initialLobby.initialFen) : new Chess(),
     side: "s",
   });
+
+  const [clocks, setClocks] = useState<{ white: number; black: number } | null>(null);
+
+  useEffect(() => {
+    if (lobby.clocks) {
+      setClocks({
+        white: lobby.clocks.white,
+        black: lobby.clocks.black
+      });
+    } else {
+      setClocks(null);
+    }
+  }, [lobby.clocks]);
+
+  useEffect(() => {
+    if (!lobby.clocks || lobby.winner || lobby.endReason || !lobby.white || !lobby.black) return;
+
+    const interval = setInterval(() => {
+      const activeTurn = lobby.actualGame.turn(); // 'w' or 'b'
+      const elapsed = Date.now() - lobby.clocks!.lastMoveTime;
+
+      setClocks(() => {
+        const whiteTime = activeTurn === "w" ? Math.max(0, lobby.clocks!.white - elapsed) : lobby.clocks!.white;
+        const blackTime = activeTurn === "b" ? Math.max(0, lobby.clocks!.black - elapsed) : lobby.clocks!.black;
+        return { white: whiteTime, black: blackTime };
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [lobby.clocks, lobby.winner, lobby.endReason, lobby.white, lobby.black, lobby.actualGame]);
+
+  function formatClockTime(ms: number) {
+    if (ms <= 0) return "0:00";
+    const totalSecs = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+
+    if (ms < 10000) {
+      const tenths = Math.floor((ms % 1000) / 100);
+      return `${secs}.${tenths}`;
+    }
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  }
 
   const [customSquares, updateCustomSquares] = useReducer(squareReducer, {
     options: {},
@@ -64,10 +104,105 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   const [playBtnLoading, setPlayBtnLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
-  const [boardTheme, setBoardTheme] = useState({ dark: "#4b7399", light: "#eae9d2" });
+  const [boardTheme, setBoardTheme] = useState({ dark: "#0e4a3b", light: "#eeeddf" });
 
   const [evalScore, setEvalScore] = useState<number>(0);
-  const [showEval, setShowEval] = useState<boolean>(true);
+  const showEval = true;
+
+  const [premoveQueue, setPremoveQueue] = useState<{ from: string; to: string; promotion?: string }[]>([]);
+  const [flipBoard, setFlipBoard] = useState(false);
+  const [settings, setSettings] = useState({
+    sound: true,
+    highlights: true,
+    premoves: true
+  });
+
+  // Inline confirmation dialog state
+  const [confirmModal, setConfirmModal] = useState<{
+    type: "resign" | "abort" | null;
+  }>({ type: null });
+
+  // Draw offer notification state
+  const [drawOfferFrom, setDrawOfferFrom] = useState<string | null>(null);
+
+  const onToggleSetting = (key: "sound" | "highlights" | "premoves") => {
+    setSettings((prev) => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const onResign = () => {
+    setConfirmModal({ type: "resign" });
+  };
+
+  const onOfferDraw = () => {
+    socket.emit("offerDraw");
+  };
+
+  const onAbort = () => {
+    setConfirmModal({ type: "abort" });
+  };
+
+  const handleConfirmAction = () => {
+    if (confirmModal.type === "resign") socket.emit("resignMatch");
+    else if (confirmModal.type === "abort") socket.emit("abortMatch");
+    setConfirmModal({ type: null });
+  };
+
+  // Keyboard Navigation Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: any) => {
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        navigateMove(navIndex === null ? "prev" : navIndex - 1);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        navigateMove(navIndex === null ? null : navIndex + 1);
+      } else if (e.key === " ") {
+        e.preventDefault();
+        setFlipBoard((prev) => !prev);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        setPremoveQueue([]);
+        if (chessboardRef.current) {
+          chessboardRef.current.clearPremoves(true);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [navIndex, lobby.actualGame, navigateMove]);
+
+  // Trigger next premove if it is now our turn
+  useEffect(() => {
+    if (lobby.side === "s" || lobby.winner || lobby.endReason) return;
+    if (lobby.side === lobby.actualGame.turn() && premoveQueue.length > 0) {
+      const timer = setTimeout(() => {
+        const nextPremove = premoveQueue[0];
+        setPremoveQueue((prev) => prev.slice(1));
+        
+        const move = makeMove(nextPremove);
+        if (move) {
+          socket.emit("sendMove", nextPremove);
+        } else {
+          setPremoveQueue([]);
+          if (chessboardRef.current) {
+            chessboardRef.current.clearPremoves(true);
+          }
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [lobby.side, lobby.winner, lobby.endReason, lobby.actualGame, lobby.pgn, premoveQueue, makeMove]);
 
   useEffect(() => {
     if (!lobby.actualGame) return;
@@ -85,7 +220,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
       const savedTheme = localStorage.getItem("chessthan:boardTheme");
       if (savedTheme) {
         const THEMES = [
-          { id: "emerald", dark: "#4b7399", light: "#eae9d2" },
+          { id: "emerald", dark: "#0e4a3b", light: "#eeeddf" },
           { id: "wood", dark: "#b58863", light: "#f0d9b5" },
           { id: "glass", dark: "#5e81ac", light: "#eceff4" },
           { id: "slate", dark: "#475569", light: "#cbd5e1" },
@@ -156,7 +291,11 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   ]);
 
   useEffect(() => {
-    if (!session?.user || !session.user?.id) return;
+    const userToUse = (session?.user && session.user?.id) ? session.user : {
+      id: `guest_${Math.random().toString(36).substring(2, 9)}`,
+      name: `Guest_${Math.floor(1000 + Math.random() * 9000)}`
+    };
+
     socket.connect();
 
     window.addEventListener("resize", handleResize);
@@ -170,15 +309,16 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
       });
     }
 
-    syncSide(session.user, undefined, lobby, { updateLobby });
+    syncSide(userToUse, undefined, lobby, { updateLobby });
 
-    initSocket(session.user, socket, lobby, {
+    initSocket(userToUse, socket, lobby, {
       updateLobby,
       addMessage,
       updateCustomSquares,
       makeMove,
       setNavFen,
       setNavIndex,
+      setDrawOfferFrom,
     });
 
     return () => {
@@ -220,15 +360,21 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
   }
 
   function handleResize() {
+    const maxHeightBased = Math.floor(window.innerHeight * 0.70);
+    let targetWidth = 480;
+
     if (window.innerWidth >= 1920) {
-      setBoardWidth(580);
+      targetWidth = 580;
     } else if (window.innerWidth >= 1536) {
-      setBoardWidth(540);
+      targetWidth = 540;
     } else if (window.innerWidth >= 768) {
-      setBoardWidth(480);
+      targetWidth = 480;
     } else {
-      setBoardWidth(350);
+      targetWidth = 330;
     }
+
+    const finalWidth = Math.min(targetWidth, maxHeightBased);
+    setBoardWidth(finalWidth);
   }
 
   function addMessage(message: Message) {
@@ -336,7 +482,19 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
       return false;
 
     // premove
-    if (lobby.side !== lobby.actualGame.turn()) return true;
+    if (lobby.side !== lobby.actualGame.turn()) {
+      if (settings.premoves) {
+        const piece = lobby.actualGame.get(sourceSquare);
+        if (piece && piece.color === lobby.side) {
+          setPremoveQueue((prev) => [
+            ...prev,
+            { from: sourceSquare, to: targetSquare, promotion: "q" }
+          ]);
+          return true;
+        }
+      }
+      return false;
+    }
 
     const moveDetails = {
       from: sourceSquare,
@@ -453,61 +611,88 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
 
   function getPlayerHtml(side: "top" | "bottom") {
     const blackHtml = (
-      <div className="flex w-full flex-col justify-center">
-        <a
-          className={
-            (lobby.black?.name ? "font-bold" : "") +
-            (typeof lobby.black?.id === "number"
-              ? " text-primary link-hover"
-              : " cursor-default")
-          }
-          href={
-            typeof lobby.black?.id === "number"
-              ? `/user/${lobby.black?.name}`
-              : undefined
-          }
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {lobby.black?.name || "(no one)"}
-        </a>
-        <span className="flex items-center gap-1 text-xs">
-          black
-          {lobby.black?.connected === false && (
-            <span className="badge badge-xs badge-error">disconnected</span>
-          )}
-        </span>
+      <div className="flex w-full items-center justify-between bg-base-200 border border-base-300 p-3 rounded-xl mb-1.5 shadow-sm">
+        <div className="flex flex-col">
+          <a
+            className={
+              (lobby.black?.name ? "font-bold" : "text-base-content/40 italic") +
+              (typeof lobby.black?.id === "number"
+                ? " text-primary link-hover"
+                : " cursor-default")
+            }
+            href={
+              typeof lobby.black?.id === "number"
+                ? `/user/${lobby.black?.name}`
+                : undefined
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {lobby.black?.name || "(Waiting for opponent)"}
+          </a>
+          <span className="flex items-center gap-1 text-[10px] text-base-content/50 font-bold uppercase">
+            ⚫ Black
+            {lobby.black && lobby.black.connected === false && (
+              <span className="badge badge-xs badge-error">disconnected</span>
+            )}
+          </span>
+        </div>
+
+        {/* Clock badge */}
+        {clocks && (
+          <div className={`px-3 py-1.5 rounded-lg font-mono text-sm font-black tracking-wider ${
+            lobby.actualGame.turn() === "b" && !lobby.winner && !lobby.endReason
+              ? "bg-primary text-primary-content animate-pulse ring-2 ring-primary/40 shadow-lg"
+              : "bg-base-300 text-base-content/70"
+          }`}>
+            {formatClockTime(clocks.black)}
+          </div>
+        )}
       </div>
     );
     const whiteHtml = (
-      <div className="flex w-full flex-col justify-center">
-        <a
-          className={
-            (lobby.white?.name ? "font-bold" : "") +
-            (typeof lobby.white?.id === "number"
-              ? " text-primary link-hover"
-              : " cursor-default")
-          }
-          href={
-            typeof lobby.white?.id === "number"
-              ? `/user/${lobby.white?.name}`
-              : undefined
-          }
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {lobby.white?.name || "(no one)"}
-        </a>
-        <span className="flex items-center gap-1 text-xs">
-          white
-          {lobby.white?.connected === false && (
-            <span className="badge badge-xs badge-error">disconnected</span>
-          )}
-        </span>
+      <div className="flex w-full items-center justify-between bg-base-200 border border-base-300 p-3 rounded-xl mb-1.5 shadow-sm">
+        <div className="flex flex-col">
+          <a
+            className={
+              (lobby.white?.name ? "font-bold" : "text-base-content/40 italic") +
+              (typeof lobby.white?.id === "number"
+                ? " text-primary link-hover"
+                : " cursor-default")
+            }
+            href={
+              typeof lobby.white?.id === "number"
+                ? `/user/${lobby.white?.name}`
+                : undefined
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {lobby.white?.name || "(Waiting for opponent)"}
+          </a>
+          <span className="flex items-center gap-1 text-[10px] text-base-content/50 font-bold uppercase">
+            ⚪ White
+            {lobby.white && lobby.white.connected === false && (
+              <span className="badge badge-xs badge-error">disconnected</span>
+            )}
+          </span>
+        </div>
+
+        {/* Clock badge */}
+        {clocks && (
+          <div className={`px-3 py-1.5 rounded-lg font-mono text-sm font-black tracking-wider ${
+            lobby.actualGame.turn() === "w" && !lobby.winner && !lobby.endReason
+              ? "bg-primary text-primary-content animate-pulse ring-2 ring-primary/40 shadow-lg"
+              : "bg-base-300 text-base-content/70"
+          }`}>
+            {formatClockTime(clocks.white)}
+          </div>
+        )}
       </div>
     );
 
-    if (lobby.black?.id === session?.user?.id) {
+    const isUserBlack = lobby.side === "b" || (session?.user && String(lobby.black?.id) === String(session.user.id)) || (session?.user?.name && lobby.black?.name === session.user.name);
+    if (isUserBlack) {
       return side === "top" ? whiteHtml : blackHtml;
     } else {
       return side === "top" ? blackHtml : whiteHtml;
@@ -527,62 +712,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     }, 5000);
   }
 
-  function getMoveListHtml() {
-    const history = lobby.actualGame.history({ verbose: true });
-    const movePairs = history
-      .slice(history.length / 2)
-      .map((_, i) => history.slice((i *= 2), i + 2));
 
-    return movePairs.map((moves, i) => {
-      return (
-        <tr className="flex w-full items-center gap-1" key={i + 1}>
-          <td className="">{i + 1}.</td>
-          <td
-            className={
-              "btn btn-ghost btn-xs h-full w-2/5 font-normal normal-case" +
-              ((history.indexOf(moves[0]) === history.length - 1 &&
-                navIndex === null) ||
-              navIndex === history.indexOf(moves[0])
-                ? " btn-active pointer-events-none rounded-none"
-                : "")
-            }
-            id={
-              (history.indexOf(moves[0]) === history.length - 1 &&
-                navIndex === null) ||
-              navIndex === history.indexOf(moves[0])
-                ? "activeNavMove"
-                : ""
-            }
-            onClick={() => navigateMove(history.indexOf(moves[0]))}
-          >
-            {moves[0].san}
-          </td>
-          {moves[1] && (
-            <td
-              className={
-                "btn btn-ghost btn-xs h-full w-2/5 font-normal normal-case" +
-                ((history.indexOf(moves[1]) === history.length - 1 &&
-                  navIndex === null) ||
-                navIndex === history.indexOf(moves[1])
-                  ? " btn-active pointer-events-none rounded-none"
-                  : "")
-              }
-              id={
-                (history.indexOf(moves[1]) === history.length - 1 &&
-                  navIndex === null) ||
-                navIndex === history.indexOf(moves[1])
-                  ? "activeNavMove"
-                  : ""
-              }
-              onClick={() => navigateMove(history.indexOf(moves[1]))}
-            >
-              {moves[1].san}
-            </td>
-          )}
-        </tr>
-      );
-    });
-  }
 
   function navigateMove(index: number | null | "prev") {
     const history = lobby.actualGame.history({ verbose: true });
@@ -622,6 +752,15 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     };
   }
 
+  const getPremoveHighlights = () => {
+    const styles: { [square: string]: { background: string } } = {};
+    premoveQueue.forEach((m) => {
+      styles[m.from] = { background: "rgba(249, 115, 22, 0.4)" };
+      styles[m.to] = { background: "rgba(249, 115, 22, 0.4)" };
+    });
+    return styles;
+  };
+
   function claimAbandoned(type: "win" | "draw") {
     if (
       lobby.side === "s" ||
@@ -635,8 +774,6 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     }
     socket.emit("claimAbandoned", type);
   }
-  console.log("Lobby", lobby);
-  console.log("Session", session);
   return (
     <div className="flex flex-col items-center justify-center w-full h-full gap-4">
       {(lobby.winner === "black" && lobby?.black?.id === session?.user?.id) ||
@@ -646,12 +783,62 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
           className="flex justify-center items-center absolute top-0 left-0 w-full h-full z-0"
           loop={true}
         />
-      ) : lobby.winner&&(
-        <div className="flex flex-row items-center justify-center gap-4">
-          <h1>Better luck next time!!</h1>
-          <Lottie animationData={check}
-          className="flex justify-center items-center"
+      ) : lobby.winner ? (
+        <Lottie animationData={check}
+          className="flex justify-center items-center absolute top-0 left-0 w-full h-full z-0 opacity-30"
           loop={true} />
+      ) : null}
+
+      {/* Inline Confirm Modal for Resign / Abort */}
+      {confirmModal.type && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate__animated animate__fadeIn">
+          <div className="card bg-base-200 border border-base-300 shadow-2xl p-6 w-full max-w-xs text-center gap-4">
+            <h3 className="text-lg font-black">
+              {confirmModal.type === "resign" ? "🏳️ Resign Match?" : "⛔ Abort Match?"}
+            </h3>
+            <p className="text-sm text-base-content/60">
+              {confirmModal.type === "resign"
+                ? "You will forfeit the game. This action cannot be undone."
+                : "The game will be cancelled. Both players must agree or one side must abort before move 2."}
+            </p>
+            <div className="flex gap-2 mt-2">
+              <button
+                className="btn btn-sm flex-1 btn-ghost"
+                onClick={() => setConfirmModal({ type: null })}
+              >
+                Cancel
+              </button>
+              <button
+                className={`btn btn-sm flex-1 ${confirmModal.type === "resign" ? "btn-error" : "btn-warning"}`}
+                onClick={handleConfirmAction}
+              >
+                {confirmModal.type === "resign" ? "Resign" : "Abort"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Draw Offer Notification */}
+      {drawOfferFrom && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate__animated animate__slideInUp">
+          <div className="card bg-base-200 border border-base-300 shadow-2xl p-4 flex flex-row items-center gap-4">
+            <span className="text-sm font-bold">🤝 <strong>{drawOfferFrom}</strong> offered a draw</span>
+            <div className="flex gap-2">
+              <button
+                className="btn btn-xs btn-success"
+                onClick={() => { socket.emit("acceptDraw"); setDrawOfferFrom(null); }}
+              >
+                Accept
+              </button>
+              <button
+                className="btn btn-xs btn-ghost"
+                onClick={() => setDrawOfferFrom(null)}
+              >
+                Decline
+              </button>
+            </div>
+          </div>
         </div>
       )}
       <div className="flex w-full flex-wrap justify-center gap-6 px-4 py-4 lg:gap-10 2xl:gap-16 animate__animated animate__fadeIn">
@@ -707,7 +894,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
               customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
               customLightSquareStyle={{ backgroundColor: boardTheme.light }}
               position={navFen || lobby.actualGame.fen()}
-              boardOrientation={lobby.side === "b" ? "black" : "white"}
+              boardOrientation={lobby.side === "b" ? (flipBoard ? "white" : "black") : (flipBoard ? "black" : "white")}
               isDraggablePiece={isDraggablePiece}
               onPieceDragBegin={onPieceDragBegin}
               onPieceDragEnd={onPieceDragEnd}
@@ -722,6 +909,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
                 ...(navIndex === null ? customSquares.check : {}),
                 ...customSquares.rightClicked,
                 ...(navIndex === null ? customSquares.options : {}),
+                ...getPremoveHighlights(),
               }}
               ref={chessboardRef}
             />
@@ -763,69 +951,19 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
                   </div>
                 </div>
               </div>
-              <div className="h-32 w-full overflow-y-scroll" ref={moveListRef}>
-                <table className="table-compact table w-full">
-                  <tbody>{getMoveListHtml()}</tbody>
-                </table>
-              </div>
-              <div className="flex h-4 w-full">
-                <button
-                  className={
-                    "btn btn-sm flex-grow rounded-r-none" +
-                    (navIndex === 0 || lobby.actualGame.history().length <= 1
-                      ? " btn-disabled"
-                      : "")
-                  }
-                  onClick={() => navigateMove(0)}
-                >
-                  <IconPlayerSkipBack size={18} />
-                </button>
-                <button
-                  className={
-                    "btn btn-sm flex-grow rounded-none" +
-                    (navIndex === 0 || lobby.actualGame.history().length <= 1
-                      ? " btn-disabled"
-                      : "")
-                  }
-                  onClick={() =>
-                    navigateMove(navIndex === null ? "prev" : navIndex - 1)
-                  }
-                >
-                  <IconChevronLeft size={18} />
-                </button>
-                <button
-                  className={
-                    "btn btn-sm flex-grow rounded-none" +
-                    (navIndex === null ? " btn-disabled" : "")
-                  }
-                  onClick={() =>
-                    navigateMove(navIndex === null ? null : navIndex + 1)
-                  }
-                >
-                  <IconChevronRight size={18} />
-                </button>
-                <button
-                  className={
-                    "btn btn-sm flex-grow rounded-l-none" +
-                    (navIndex === null ? " btn-disabled" : "")
-                  }
-                  onClick={() => navigateMove(null)}
-                >
-                  <IconPlayerSkipForward size={18} />
-                </button>
-              </div>
 
-              {/* Live Position Analysis Toggle */}
-              <div className="flex items-center justify-between bg-base-200 p-2.5 rounded-lg border border-base-300 text-xs mt-3">
-                <span className="font-bold text-base-content/60">Live Position Analysis</span>
-                <input
-                  type="checkbox"
-                  className="toggle toggle-primary toggle-xs"
-                  checked={showEval}
-                  onChange={(e) => setShowEval(e.target.checked)}
-                />
-              </div>
-
+              <BoardControlPanel
+                history={lobby.actualGame.history({ verbose: true })}
+                navIndex={navIndex}
+                navigateMove={navigateMove}
+                setBoardTheme={setBoardTheme}
+                settings={settings}
+                onToggleSetting={onToggleSetting}
+                onResign={lobby.side !== "s" && !lobby.endReason && !lobby.winner ? onResign : undefined}
+                onOfferDraw={lobby.side !== "s" && !lobby.endReason && !lobby.winner ? onOfferDraw : undefined}
+                onAbort={lobby.side !== "s" && lobby.actualGame.history().length <= 1 && !lobby.endReason && !lobby.winner ? onAbort : undefined}
+                onFlipBoard={() => setFlipBoard((prev) => !prev)}
+              />
             </div>
           </div>
 
@@ -960,6 +1098,7 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
         winner={lobby.winner as any}
         playerColor={lobby.side === "w" ? "white" : lobby.side === "b" ? "black" : "observer"}
         reason={lobby.endReason || "agreement"}
+        pgn={lobby.pgn}
       />
     </div>
   );

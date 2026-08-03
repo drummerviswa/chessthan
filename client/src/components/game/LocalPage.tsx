@@ -11,10 +11,12 @@ import { playSound, triggerHaptic } from "@/lib/audioEffects";
 import GameResultModal from "@/components/game/GameResultModal";
 
 // Bot Personalities configuration
+// Bot Personalities configuration
 const BOT_PERSONALITIES = [
     {
         id: "beginner",
         name: "Beginner Bot",
+        category: "Casual",
         elo: 600,
         desc: "Easy play, friendly feedback.",
         avatar: "🤖",
@@ -28,6 +30,7 @@ const BOT_PERSONALITIES = [
     {
         id: "trashtalk",
         name: "Trash Talk Bot",
+        category: "Casual",
         elo: 1100,
         desc: "Sarcastic banter, basic tactics.",
         avatar: "🤪",
@@ -39,8 +42,23 @@ const BOT_PERSONALITIES = [
         quotesGood: ["Pff, a lucky guess.", "I let you play that, obviously.", "Fine, not terrible. Don't get cocky though.", "A broken clock is right twice a day."]
     },
     {
+        id: "club",
+        name: "Club Player Bot",
+        category: "Casual",
+        elo: 1400,
+        desc: "Plays standard openings, solid defense.",
+        avatar: "♟️",
+        depth: 2,
+        delay: 1100,
+        quoteStart: "Hey there! Ready for a solid club-level match? Let's see your positional skills.",
+        quotesMove: ["Solidifying my pawns.", "Developing towards the center.", "Castling is next on my list.", "Keeping pieces protected."],
+        quotesBlunder: ["Oh, that left your pawn hanging.", "Be careful of back-rank weaknesses!", "Looks like I found an open file there."],
+        quotesGood: ["Nice defense! You're solid.", "A sensible developing move.", "Good space control there."]
+    },
+    {
         id: "coach",
         name: "Coach Bot",
+        category: "Mentors",
         elo: 1500,
         desc: "Explains positions, offers takebacks.",
         avatar: "👨‍🏫",
@@ -52,8 +70,37 @@ const BOT_PERSONALITIES = [
         quotesGood: ["Splendid move! You seized the open file.", "Great tactical vision! That was a strong continuation.", "Perfect development of your knight, controlling key squares."]
     },
     {
+        id: "tactics_trainer",
+        name: "Tactics Coach",
+        category: "Mentors",
+        elo: 1700,
+        desc: "Examines your forks and double-attacks.",
+        avatar: "🧠",
+        depth: 3,
+        delay: 1300,
+        quoteStart: "Hello! I love tactics. Keep an eye out for double attacks and pins!",
+        quotesMove: ["Are there any pins on the board?", "Look for unprotected pieces.", "Forks can happen in one move.", "Always check your king safety."],
+        quotesBlunder: ["Ah! That setup allowed a tactical pin.", "Oops, you missed a potential fork warning.", "Remember: undefended pieces are tactical targets."],
+        quotesGood: ["A beautiful pin! Well spotted.", "Excellent double attack, winning material!", "Very sharp tactical vision."]
+    },
+    {
+        id: "morphy",
+        name: "Morphy Style",
+        category: "Tacticians",
+        elo: 2200,
+        desc: "Rapid piece activation.",
+        avatar: "🏇",
+        depth: 3,
+        delay: 1400,
+        quoteStart: "Develop your pieces rapidly! Open files and launch open-board attacks.",
+        quotesMove: ["Development is the key to chess.", "Bringing my pieces into the battle.", "Opening lines for my rooks.", "Every tempo is worth a pawn."],
+        quotesBlunder: ["You fell behind in piece development.", "Your king is stuck in the open center!", "A slow move is fatal in open games."],
+        quotesGood: ["Superb rapid piece activation!", "Nice control of the open diagonal.", "You are fighting for the initiative! Excellent."]
+    },
+    {
         id: "tal",
         name: "Tal Style",
+        category: "Tacticians",
         elo: 2400,
         desc: "Highly tactical, sacrifices pieces.",
         avatar: "🔥",
@@ -65,8 +112,23 @@ const BOT_PERSONALITIES = [
         quotesGood: ["Ah, an elegant defense!", "You fight well in the tactical storm.", "Dangerous counterplay! I respect that."]
     },
     {
+        id: "capa",
+        name: "Capablanca Style",
+        category: "Legends",
+        elo: 2500,
+        desc: "Simple positional plans, clean endgames.",
+        avatar: "⚖️",
+        depth: 3,
+        delay: 1600,
+        quoteStart: "Play simply and posisionally. The endgame is where the truth of chess resides.",
+        quotesMove: ["Positioning my pieces on their optimal squares.", "Neutralizing your active assets.", "Preparing for a clean endgame transition.", "Simple, logical chess moves."],
+        quotesBlunder: ["You created unnecessary weaknesses in your structure.", "Now I transition into a won rook ending.", "Your minor piece is poorly placed."],
+        quotesGood: ["Very logical, clean positional play.", "You are trading off my active assets correctly.", "A solid, patient move."]
+    },
+    {
         id: "magnus",
         name: "Magnus Style",
+        category: "Legends",
         elo: 2850,
         desc: "Flawless positional endgames.",
         avatar: "👑",
@@ -75,7 +137,7 @@ const BOT_PERSONALITIES = [
         quoteStart: "Some people think that if their opponent plays a beautiful game, it's okay. I don't. I only want to win.",
         quotesMove: ["Pressuring your weak pawn. Let's see how you defend.", "Step by step, I squeeze your position.", "Let's enter the endgame where technical precision wins.", "Developing small, long-term advantages."],
         quotesBlunder: ["Your structure is permanently damaged. There is no recovery.", "This endgame is technically won for me.", "You gave up the bishop pair, which is fatal in this open board."],
-        quotesGood: ["A solid, defensive move. You are holding on.", "You are preventing my squeeze. Impressive.", "Very mature play. We have a battle here."]
+        quotesGood: ["A solid, defensive move. You are holding on.", "You are preventing my squeeze. Impressive.", "Very speculative play. We have a battle here."]
     }
 ];
 
@@ -95,13 +157,13 @@ function LocalPageContent() {
     const [isGameOver, setIsGameOver] = useState(false);
     
     // Theme loader
-    const [boardTheme, setBoardTheme] = useState({ dark: "#4b7399", light: "#eae9d2" });
+    const [boardTheme, setBoardTheme] = useState({ dark: "#0e4a3b", light: "#eeeddf" });
     useEffect(() => {
         if (typeof window !== "undefined") {
             const savedTheme = localStorage.getItem("chessthan:boardTheme");
             if (savedTheme) {
                 const THEMES = [
-                    { id: "emerald", dark: "#4b7399", light: "#eae9d2" },
+                    { id: "emerald", dark: "#0e4a3b", light: "#eeeddf" },
                     { id: "wood", dark: "#b58863", light: "#f0d9b5" },
                     { id: "glass", dark: "#5e81ac", light: "#eceff4" },
                     { id: "slate", dark: "#475569", light: "#cbd5e1" },
@@ -584,15 +646,38 @@ function LocalPageContent() {
                             <div>
                                 <label className="label label-text py-1 text-xs font-semibold">Select Bot Personality</label>
                                 <select
-                                    className="select select-bordered select-sm w-full"
+                                    className="select select-bordered select-sm w-full font-semibold"
                                     value={selectedBotId}
                                     onChange={(e) => setSelectedBotId(e.target.value)}
                                 >
-                                    {BOT_PERSONALITIES.map((bot) => (
-                                        <option key={bot.id} value={bot.id}>
-                                            {bot.avatar} {bot.name} ({bot.elo} ELO)
-                                        </option>
-                                    ))}
+                                    <optgroup label="⚡ Casual sparring partners">
+                                        {BOT_PERSONALITIES.filter(b => b.category === "Casual").map((bot) => (
+                                            <option key={bot.id} value={bot.id}>
+                                                {bot.avatar} {bot.name} ({bot.elo} ELO)
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="👨‍🏫 Mentors & Coaches">
+                                        {BOT_PERSONALITIES.filter(b => b.category === "Mentors").map((bot) => (
+                                            <option key={bot.id} value={bot.id}>
+                                                {bot.avatar} {bot.name} ({bot.elo} ELO)
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="🔥 Tactical Legends">
+                                        {BOT_PERSONALITIES.filter(b => b.category === "Tacticians").map((bot) => (
+                                            <option key={bot.id} value={bot.id}>
+                                                {bot.avatar} {bot.name} ({bot.elo} ELO)
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="👑 Engine Champions">
+                                        {BOT_PERSONALITIES.filter(b => b.category === "Legends").map((bot) => (
+                                            <option key={bot.id} value={bot.id}>
+                                                {bot.avatar} {bot.name} ({bot.elo} ELO)
+                                            </option>
+                                        ))}
+                                    </optgroup>
                                 </select>
                             </div>
 

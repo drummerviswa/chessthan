@@ -7,8 +7,18 @@ import { INIT_TABLES, db } from "./db/index.js";
 import session from "./middleware/session.js";
 import routes from "./routes/index.js";
 import { init as initSocket } from "./socket/index.js";
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""));
 const corsConfig = {
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+            callback(null, true);
+        }
+        else {
+            callback(new Error(`CORS policy violation: ${origin} not allowed`));
+        }
+    },
     credentials: true
 };
 const app = express();
@@ -17,11 +27,15 @@ const server = createServer(app);
 await db.connect();
 db.query(INIT_TABLES, (err) => {
     if (err) {
-        console.error(err);
+        console.error("Database table initialization error:", err);
     }
     else {
-        console.log("Tables initialized");
+        console.log("Tables initialized successfully");
     }
+});
+// health check routes
+app.get(["/health", "/v1/health"], (_req, res) => {
+    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 // middleware
 app.use(cors(corsConfig));
@@ -36,7 +50,14 @@ io.use((socket, next) => {
 });
 io.use((socket, next) => {
     const session = socket.request.session;
-    if (session && session.user) {
+    if (session) {
+        if (!session.user) {
+            const guestId = -Math.floor(100000 + Math.random() * 900000);
+            session.user = {
+                id: guestId,
+                name: `Guest_${Math.floor(1000 + Math.random() * 9000)}`
+            };
+        }
         next();
     }
     else {
@@ -49,3 +70,16 @@ const port = process.env.PORT || 5000;
 server.listen(port, () => {
     console.log(`chessthan api server listening on :${port}`);
 });
+// Graceful shutdown handling
+const shutdown = (signal) => {
+    console.log(`Received ${signal}. Shutting down gracefully...`);
+    server.close(() => {
+        console.log("HTTP server closed.");
+        db.end(() => {
+            console.log("PostgreSQL connection pool closed.");
+            process.exit(0);
+        });
+    });
+};
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

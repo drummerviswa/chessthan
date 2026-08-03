@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { API_URL } from "@/config";
+import { IconTrophy } from "@tabler/icons-react";
 
 interface Player {
     id: number;
@@ -27,7 +28,7 @@ export default function LeaderboardPage() {
     const [players, setPlayers] = useState<Player[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchLeaderboard = async () => {
+    const fetchLeaderboard = useCallback(async () => {
         setLoading(true);
         try {
             const url = tab === "elo"
@@ -44,97 +45,91 @@ export default function LeaderboardPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [tab, eloType, division]);
 
     useEffect(() => {
         fetchLeaderboard();
-    }, [tab, eloType, division]);
-
-    const getDivisionBadgeColor = (div: string) => {
-        if (div === "Gold") return "badge-warning text-warning-content";
-        if (div === "Silver") return "badge-neutral text-neutral-content";
-        return "badge-primary text-primary-content"; // Bronze
-    };
+    }, [fetchLeaderboard]);
 
     return (
-        <div className="flex flex-col items-center w-full max-w-4xl px-4">
+        <div className="flex flex-col items-center w-full max-w-4xl px-4 py-6 space-y-6">
             
             {/* Header */}
-            <div className="text-center mb-8">
-                <h1 className="text-3xl font-extrabold flex items-center justify-center gap-2">
-                    🏆 Chessthan Arena Leaderboard
+            <div className="text-center space-y-1">
+                <div className="flex items-center justify-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-slate-400">Global Standings</span>
+                </div>
+                <h1 className="text-2xl font-black tracking-tight text-slate-100 flex items-center justify-center gap-2">
+                    <IconTrophy size={22} className="text-amber-400" /> Leaderboard & Leagues
                 </h1>
-                <p className="text-sm text-base-content/60 mt-1">
-                    See where you stand among top players globally and weekly division leagues
+                <p className="text-xs text-slate-400">
+                    Track top players across rating categories and weekly division leagues
                 </p>
             </div>
 
             {/* Main Tabs */}
-            <div className="tabs tabs-boxed grid grid-cols-2 w-full max-w-md mb-6 p-1">
+            <div className="tabs tabs-boxed grid grid-cols-2 w-full max-w-md p-1 bg-base-200 border border-base-300 rounded-xl">
                 <button
                     onClick={() => setTab("elo")}
-                    className={`tab ${tab === "elo" ? "tab-active font-bold" : ""}`}
+                    className={`tab text-xs font-bold rounded-lg transition-all ${tab === "elo" ? "tab-active bg-primary text-primary-content" : "text-slate-400"}`}
                 >
-                    📈 Global ELO Standings
+                    Global ELO Standings
                 </button>
                 <button
                     onClick={() => setTab("leagues")}
-                    className={`tab ${tab === "leagues" ? "tab-active font-bold" : ""}`}
+                    className={`tab text-xs font-bold rounded-lg transition-all ${tab === "leagues" ? "tab-active bg-primary text-primary-content" : "text-slate-400"}`}
                 >
-                    💎 Weekly Division Leagues
+                    Weekly Division Leagues
                 </button>
             </div>
 
             {/* Filters panel */}
-            <div className="flex justify-end w-full mb-4">
+            <div className="flex justify-between items-center w-full">
+                <span className="text-[11px] font-mono text-slate-400 font-bold uppercase">
+                    {tab === "elo" ? "Category Filter" : "League Tier"}
+                </span>
                 {tab === "elo" ? (
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs text-base-content/60">Category:</span>
-                        <select
-                            className="select select-bordered select-xs"
-                            value={eloType}
-                            onChange={(e) => setEloType(e.target.value)}
-                        >
-                            <option value="blitz">⚡ Blitz</option>
-                            <option value="bullet">Bullet</option>
-                            <option value="rapid">⏱️ Rapid</option>
-                            <option value="classical">🏰 Classical</option>
-                            <option value="puzzle">🧩 Puzzles</option>
-                        </select>
-                    </div>
+                    <select
+                        className="select select-bordered select-xs text-xs font-mono"
+                        value={eloType}
+                        onChange={(e) => setEloType(e.target.value)}
+                    >
+                        <option value="blitz">Blitz</option>
+                        <option value="bullet">Bullet</option>
+                        <option value="rapid">Rapid</option>
+                        <option value="classical">Classical</option>
+                        <option value="puzzle">Puzzles</option>
+                    </select>
                 ) : (
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs text-base-content/60">League Division:</span>
-                        <select
-                            className="select select-bordered select-xs"
-                            value={division}
-                            onChange={(e) => setDivision(e.target.value)}
-                        >
-                            <option value="Bronze">🥉 Bronze League</option>
-                            <option value="Silver">🥈 Silver League</option>
-                            <option value="Gold">🥇 Gold League</option>
-                        </select>
-                    </div>
+                    <select
+                        className="select select-bordered select-xs text-xs font-mono"
+                        value={division}
+                        onChange={(e) => setDivision(e.target.value)}
+                    >
+                        <option value="Bronze">Bronze League</option>
+                        <option value="Silver">Silver League</option>
+                        <option value="Gold">Gold League</option>
+                    </select>
                 )}
             </div>
 
             {/* Leaderboard Table Container */}
-            <div className="card w-full bg-base-100 border border-base-300 shadow-xl overflow-hidden">
+            <div className="card w-full bg-base-200 border border-base-300 shadow-lg overflow-hidden">
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-20">
-                        <span className="loading loading-spinner loading-lg text-primary"></span>
-                        <div className="text-xs text-base-content/50 mt-2">Fetching ranking data...</div>
+                    <div className="flex flex-col items-center justify-center py-16">
+                        <span className="loading loading-spinner loading-md text-primary"></span>
                     </div>
                 ) : players.length === 0 ? (
-                    <div className="text-center py-16 text-xs text-base-content/40 border border-dashed border-base-300 rounded m-6">
-                        No active players in this bracket yet. Be the first to claim a spot!
+                    <div className="text-center py-16 text-xs text-slate-500 font-mono border border-dashed border-base-300 rounded-xl m-6">
+                        No active players in this division bracket. Play games to claim top ranking!
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="table w-full">
+                        <table className="table w-full text-xs">
                             <thead>
-                                <tr className="bg-base-200">
-                                    <th className="w-12 text-center">Rank</th>
+                                <tr className="bg-base-100 border-b border-base-300 text-slate-400 font-mono text-[10px] uppercase">
+                                    <th className="w-12 text-center">#</th>
                                     <th>Player</th>
                                     {tab === "elo" ? (
                                         <>
@@ -143,8 +138,8 @@ export default function LeaderboardPage() {
                                         </>
                                     ) : (
                                         <>
-                                            <th className="text-center">Weekly XP</th>
-                                            <th className="text-center">League</th>
+                                            <th className="text-center">XP Points</th>
+                                            <th className="text-center">Division</th>
                                         </>
                                     )}
                                 </tr>
@@ -159,61 +154,49 @@ export default function LeaderboardPage() {
                                         : player.eloBlitz;
 
                                     return (
-                                        <tr key={player.id} className="hover:bg-base-200/50">
-                                            <td className="text-center font-bold text-sm">
-                                                {rank === 1 && "🥇"}
-                                                {rank === 2 && "🥈"}
-                                                {rank === 3 && "🥉"}
-                                                {rank > 3 && rank}
+                                        <tr key={player.id} className="hover:bg-base-100/50 border-b border-base-300/40">
+                                            <td className="text-center font-mono font-bold text-slate-400">
+                                                {rank}
                                             </td>
                                             <td>
                                                 <div className="flex items-center gap-3">
-                                                    <div className="avatar placeholder">
-                                                        <div className="bg-neutral text-neutral-content rounded-full w-8 h-8 flex items-center justify-center">
-                                                            {player.avatarUrl ? (
-                                                                <img src={player.avatarUrl} alt={player.name} />
-                                                            ) : (
-                                                                <span className="text-xs uppercase">{player.name[0]}</span>
-                                                            )}
-                                                        </div>
+                                                    <div className="w-7 h-7 rounded-full bg-base-300 flex items-center justify-center font-bold text-xs text-slate-200 uppercase">
+                                                        {player.avatarUrl ? (
+                                                            <img src={player.avatarUrl} alt={player.name} className="w-full h-full rounded-full object-cover" />
+                                                        ) : (
+                                                            player.name[0]
+                                                        )}
                                                     </div>
-                                                    <div>
-                                                        <a
-                                                            href={`/user/${player.name}`}
-                                                            className="font-bold text-sm text-primary link-hover"
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                        >
-                                                            {player.name}
-                                                        </a>
-                                                        <div className="text-[10px] text-base-content/50">
-                                                            ID: #{player.id}
-                                                        </div>
-                                                    </div>
+                                                    <a
+                                                        href={`/user/${player.name}`}
+                                                        className="font-bold text-slate-200 hover:text-emerald-400"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        {player.name}
+                                                    </a>
                                                 </div>
                                             </td>
                                             {tab === "elo" ? (
                                                 <>
-                                                    <td className="text-center font-semibold text-sm">
+                                                    <td className="text-center font-mono font-bold text-emerald-400">
                                                         {elo}
                                                     </td>
-                                                    <td className="text-center text-xs text-base-content/70">
-                                                        <span className="text-success font-medium">{player.wins}W</span>
+                                                    <td className="text-center text-slate-400 font-mono">
+                                                        <span className="text-emerald-400 font-bold">{player.wins}W</span>
                                                         {" - "}
                                                         <span>{player.draws}D</span>
                                                         {" - "}
-                                                        <span className="text-error font-medium">{player.losses}L</span>
+                                                        <span className="text-rose-400 font-bold">{player.losses}L</span>
                                                     </td>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <td className="text-center font-bold text-sm text-success">
+                                                    <td className="text-center font-mono font-bold text-emerald-400">
                                                         {player.xp.toLocaleString()} XP
                                                     </td>
-                                                    <td className="text-center">
-                                                        <span className={`badge badge-sm font-semibold ${getDivisionBadgeColor(player.division)}`}>
-                                                            {player.division}
-                                                        </span>
+                                                    <td className="text-center font-mono font-semibold text-slate-300">
+                                                        {player.division}
                                                     </td>
                                                 </>
                                             )}

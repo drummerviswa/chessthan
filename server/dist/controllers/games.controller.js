@@ -68,14 +68,17 @@ export const getActiveGame = async (req, res) => {
 export const createGame = async (req, res) => {
     try {
         if (!req.session.user?.id) {
-            console.log("unauthorized createGame");
-            res.status(401).end();
-            return;
+            const guestId = `guest_${Math.random().toString(36).substring(2, 9)}`;
+            const guestName = `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+            req.session.user = {
+                id: guestId,
+                name: guestName
+            };
         }
         const user = {
             id: req.session.user.id,
-            name: req.session.user.name,
-            connected: false
+            name: req.session.user.name || "Guest",
+            connected: true
         };
         const unlisted = req.body.unlisted ?? false;
         let code = generateThematicRoomCode();
@@ -83,12 +86,16 @@ export const createGame = async (req, res) => {
             code = generateThematicRoomCode();
         }
         const variant = req.body.variant || "standard";
+        const timeControl = req.body.timeControl || "Casual";
+        const rated = req.body.rated ?? false;
         const game = {
             code,
             unlisted,
             host: user,
             pgn: "",
-            variant
+            variant,
+            timeControl,
+            rated
         };
         if (variant === "chess960") {
             game.initialFen = generateChess960Fen();

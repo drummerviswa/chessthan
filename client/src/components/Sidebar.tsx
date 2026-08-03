@@ -17,7 +17,10 @@ import {
     IconLogout,
     IconLogin,
     IconEye,
-    IconSchool
+    IconSchool,
+    IconDatabase,
+    IconBook,
+    IconShieldLock
 } from "@tabler/icons-react";
 
 export default function Sidebar() {
@@ -47,10 +50,22 @@ export default function Sidebar() {
             active: pathname === "/trainer"
         },
         {
-            label: "Coaches",
-            href: "/coaches",
+            label: "Membership",
+            href: "/membership",
             icon: IconCrown,
-            active: pathname === "/coaches"
+            active: pathname === "/membership"
+        },
+        {
+            label: "Openings",
+            href: "/openings",
+            icon: IconBook,
+            active: pathname === "/openings"
+        },
+        {
+            label: "Classics",
+            href: "/database",
+            icon: IconDatabase,
+            active: pathname === "/database"
         },
         {
             label: "Puzzles",
@@ -69,6 +84,12 @@ export default function Sidebar() {
             href: "/settings",
             icon: IconSettings,
             active: pathname === "/settings"
+        },
+        {
+            label: "Admin",
+            href: "/admin",
+            icon: IconShieldLock,
+            active: pathname === "/admin"
         }
     ];
 
@@ -84,11 +105,11 @@ export default function Sidebar() {
             <aside className="hidden md:flex flex-col fixed top-0 left-0 h-screen w-16 hover:w-64 bg-base-200 border-r border-base-300 text-base-content transition-all duration-300 ease-in-out z-30 group overflow-hidden shadow-xl">
                 {/* Logo Area */}
                 <div className="flex items-center h-20 px-4 gap-3 border-b border-base-300 overflow-hidden shrink-0">
-                    <div className="w-8 h-8 shrink-0 relative animate-pulse">
+                    <div className="w-8 h-8 shrink-0 relative">
                         <Image src="/gaming.png" alt="logo" fill className="object-contain" />
                     </div>
-                    <span className="font-extrabold text-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                        Chessthan
+                    <span className="font-extrabold text-base tracking-tight text-slate-100 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                        CHESSTHAN
                     </span>
                 </div>
 

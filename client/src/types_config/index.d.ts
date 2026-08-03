@@ -15,6 +15,10 @@ export interface Game {
     variant?: "standard" | "kingofthehill" | "threecheck" | "chess960";
     initialFen?: string;
     checks?: { white: number; black: number };
+    timeControl?: string;
+    rated?: boolean;
+    clocks?: { white: number; black: number; lastMoveTime: number };
+    turnTimer?: any;
 }
 
 export interface User {
@@ -29,6 +33,10 @@ export interface User {
     division?: string;
     xp?: number;
     avatarUrl?: string;
+    eloBullet?: number;
+    eloBlitz?: number;
+    eloRapid?: number;
+    eloClassical?: number;
 
     // mainly for players, not spectators
     connected?: boolean;

@@ -16,11 +16,15 @@ export function initSocket(
         makeMove: Function;
         setNavFen: Dispatch<SetStateAction<string | null>>;
         setNavIndex: Dispatch<SetStateAction<number | null>>;
+        setDrawOfferFrom?: Dispatch<SetStateAction<string | null>>;
     }
 ) {
     socket.on("connect", () => {
         socket.emit("joinLobby", lobby.code);
     });
+    if (socket.connected) {
+        socket.emit("joinLobby", lobby.code);
+    }
     // TODO: handle disconnect
 
     socket.on("chat", (message: Message) => {
@@ -43,6 +47,12 @@ export function initSocket(
         }
     });
 
+    socket.on("drawOffered", ({ by }: { by: string }) => {
+        if (actions.setDrawOfferFrom) {
+            actions.setDrawOfferFrom(by);
+        }
+    });
+
     socket.on("userJoinedAsPlayer", ({ name, side }: { name: string; side: "white" | "black" }) => {
         actions.addMessage({
             author: { name: "server" },
@@ -58,7 +68,7 @@ export function initSocket(
             winnerSide,
             id
         }: {
-            reason: Game["endReason"];
+            reason: Game["endReason"] | "resigned" | "aborted" | "timeout";
             winnerName?: string;
             winnerSide?: "white" | "black" | "draw";
             id: number;
@@ -75,6 +85,10 @@ export function initSocket(
                 }
             } else if (reason === "checkmate") {
                 m.message = `${winnerName} (${winnerSide}) has won by checkmate.`;
+            } else if (reason === "resigned") {
+                m.message = `${winnerName} (${winnerSide}) has won. Opponent resigned.`;
+            } else if (reason === "aborted") {
+                m.message = `The game has been aborted.`;
             } else {
                 let message = "The game has ended in a draw";
                 if (reason === "repetition") {
@@ -83,12 +97,16 @@ export function initSocket(
                     message = message.concat(" due to insufficient material");
                 } else if (reason === "stalemate") {
                     message = "The game has been drawn due to stalemate";
+                } else if (reason === "draw") {
+                    message = "The game has been drawn by mutual agreement";
                 }
                 m.message = message.concat(".");
             }
+            // Normalize server-emitted reason labels to valid endReason values for lobby state
+            const normalizedReason = (reason === "resigned" ? "abandoned" : reason === "aborted" ? undefined : reason) as Game["endReason"];
             actions.updateLobby({
                 type: "updateLobby",
-                payload: { endReason: reason, winner: winnerSide || "draw", id }
+                payload: { endReason: normalizedReason, winner: winnerSide || "draw", id }
             });
             actions.addMessage(m);
         }

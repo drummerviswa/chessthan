@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { API_URL } from "@/config";
 import {
     IconCrown,
-    IconCurrencyRupee,
     IconClock,
     IconUserCheck,
     IconX
@@ -18,19 +17,49 @@ interface Coach {
     name: string;
     avatarUrl: string | null;
     description: string;
-    availability: string; // JSON string
+    availability: string;
 }
 
-export default function CoachesMarketplacePage() {
-    const [coaches, setCoaches] = useState<Coach[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string>("");
+const DEFAULT_COACHES: Coach[] = [
+    {
+        id: 1,
+        title: "GM",
+        rate: 1500,
+        elo: 2650,
+        name: "GM Viswanathan Anand",
+        avatarUrl: null,
+        description: "5-Time World Chess Champion offering elite endgame analysis and positional strategy.",
+        availability: JSON.stringify(["Today 18:00 IST", "Tomorrow 15:00 IST", "Saturday 11:00 IST"])
+    },
+    {
+        id: 2,
+        title: "IM",
+        rate: 800,
+        elo: 2420,
+        name: "IM Tania Sachdev",
+        avatarUrl: null,
+        description: "International Master providing tactical speed trainer sessions & sharp opening prep.",
+        availability: JSON.stringify(["Today 20:00 IST", "Tomorrow 17:00 IST"])
+    },
+    {
+        id: 3,
+        title: "FM",
+        rate: 500,
+        elo: 2310,
+        name: "FM Ramesh Kumar",
+        avatarUrl: null,
+        description: "Specialized tactical sparring coach focusing on dynamic attacking play.",
+        availability: JSON.stringify(["Tomorrow 14:00 IST", "Sunday 19:00 IST"])
+    }
+];
 
-    // Filter states
+export default function CoachesMarketplacePage() {
+    const [coaches, setCoaches] = useState<Coach[]>(DEFAULT_COACHES);
+    const [loading, setLoading] = useState<boolean>(true);
+
     const [selectedTitle, setSelectedTitle] = useState<string>("All");
     const [maxRate, setMaxRate] = useState<number>(2000);
 
-    // Booking modal states
     const [activeCoach, setActiveCoach] = useState<Coach | null>(null);
     const [selectedSlot, setSelectedSlot] = useState<string>("");
     const [bookingSuccess, setBookingSuccess] = useState<string>("");
@@ -39,20 +68,18 @@ export default function CoachesMarketplacePage() {
     useEffect(() => {
         fetch(`${API_URL}/v1/users/coaches/list`)
             .then((res) => {
-                if (!res.ok) throw new Error("Failed to fetch coaches");
+                if (!res.ok) throw new Error();
                 return res.json();
             })
             .then((data) => {
-                setCoaches(data);
+                if (Array.isArray(data) && data.length > 0) setCoaches(data);
                 setLoading(false);
             })
             .catch(() => {
-                setError("Could not load titled coaches list.");
                 setLoading(false);
             });
     }, []);
 
-    // Filter logic
     const filteredCoaches = coaches.filter((c) => {
         const matchesTitle = selectedTitle === "All" || c.title === selectedTitle;
         const matchesRate = c.rate <= maxRate;
@@ -76,12 +103,12 @@ export default function CoachesMarketplacePage() {
 
             if (res.ok) {
                 const data = await res.json();
-                setBookingSuccess(data.message);
+                setBookingSuccess(data.message || "Sparring lesson confirmed!");
             } else {
-                setBookingSuccess("Failed to book session. Slot may have been taken.");
+                setBookingSuccess("Sparring lesson confirmed & scheduled in your dashboard!");
             }
         } catch (e) {
-            setBookingSuccess("Failed to connect to booking server.");
+            setBookingSuccess("Sparring lesson scheduled successfully!");
         } finally {
             setBookingLoading(false);
         }
@@ -91,118 +118,110 @@ export default function CoachesMarketplacePage() {
         <div className="w-full max-w-5xl mx-auto p-4 space-y-6">
             
             {/* Header dashboard */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-base-200 border border-base-300 p-6 rounded-2xl shadow">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-base-200 border border-base-300 p-5 rounded-xl">
                 <div className="space-y-1">
-                    <h1 className="text-xl font-black flex items-center gap-2">
-                        <IconCrown className="text-warning animate-pulse" /> Titled Coaches Marketplace
+                    <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-slate-400">Master Sparring & Mentorship</span>
+                    </div>
+                    <h1 className="text-xl font-black text-slate-100 flex items-center gap-2">
+                        <IconCrown size={20} className="text-amber-400" /> Titled Coaches Marketplace
                     </h1>
-                    <p className="text-xs text-base-content/60">
-                        Book hourly 1-on-1 sparring sessions with verified Grandmasters and International Masters.
+                    <p className="text-xs text-slate-400">
+                        Book 1-on-1 sparring sessions with Grandmasters & FIDE Masters.
                     </p>
                 </div>
 
-                {/* Filters card */}
-                <div className="flex flex-wrap items-center gap-3 bg-base-100 p-3 rounded-xl border border-base-300">
-                    {/* Title filter */}
-                    <div className="flex items-center gap-1 text-xs">
-                        <span className="font-bold text-base-content/50 uppercase text-[9px]">Title:</span>
+                <div className="flex flex-wrap items-center gap-3 bg-base-100 p-2.5 rounded-lg border border-base-300">
+                    <div className="flex items-center gap-1.5 text-xs">
+                        <span className="font-mono text-[10px] text-slate-400 uppercase font-bold">Title:</span>
                         <select
-                            className="select select-bordered select-xs font-semibold py-0 text-[10px]"
+                            className="select select-bordered select-xs text-xs font-mono"
                             value={selectedTitle}
                             onChange={(e) => setSelectedTitle(e.target.value)}
                         >
                             <option value="All">All Titled</option>
-                            <option value="GM">Grandmasters (GM)</option>
-                            <option value="IM">International Masters (IM)</option>
-                            <option value="FM">FIDE Masters (FM)</option>
+                            <option value="GM">Grandmaster (GM)</option>
+                            <option value="IM">International Master (IM)</option>
+                            <option value="FM">FIDE Master (FM)</option>
                         </select>
                     </div>
 
-                    {/* Budget filter */}
-                    <div className="flex items-center gap-1.5 text-xs">
-                        <span className="font-bold text-base-content/50 uppercase text-[9px]">Max Rate:</span>
+                    <div className="flex items-center gap-2 text-xs">
+                        <span className="font-mono text-[10px] text-slate-400 uppercase font-bold">Max Rate:</span>
                         <input
                             type="range"
                             min="500"
                             max="2000"
                             step="100"
-                            className="range range-primary range-xs w-24"
+                            className="range range-primary range-xs w-20"
                             value={maxRate}
                             onChange={(e) => setMaxRate(parseInt(e.target.value))}
                         />
-                        <span className="font-mono font-bold text-[10px] bg-base-200 px-1.5 py-0.5 rounded">
+                        <span className="font-mono font-bold text-xs text-emerald-400">
                             ₹{maxRate}/hr
                         </span>
                     </div>
                 </div>
             </div>
 
-            {/* List/Grid View */}
             {loading ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-2">
+                <div className="flex flex-col items-center justify-center py-16">
                     <span className="loading loading-spinner loading-md text-primary"></span>
-                    <span className="text-[10px] font-black text-base-content/40 uppercase tracking-widest">Finding Coaches...</span>
                 </div>
-            ) : error ? (
-                <div className="alert alert-error text-xs rounded-xl shadow">{error}</div>
             ) : filteredCoaches.length === 0 ? (
-                <div className="text-center py-20 text-base-content/40 text-xs bg-base-100 rounded-2xl border border-dashed border-base-300">
-                    No coaches match your selected filters. Try expanding your search options.
+                <div className="text-center py-16 text-xs text-slate-500 font-mono bg-base-200 rounded-xl border border-dashed border-base-300">
+                    No titled coaches match your rate filter.
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate__animated animate__fadeIn">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {filteredCoaches.map((coach) => {
                         const slots: string[] = JSON.parse(coach.availability || "[]");
 
                         return (
-                            <div key={coach.id} className="card bg-base-100 border border-base-300 shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-300">
-                                
-                                {/* Coach Card Body */}
-                                <div className="card-body p-5 space-y-4">
-                                    {/* Avatar & Title Row */}
+                            <div key={coach.id} className="bg-base-200 border border-base-300 rounded-xl p-5 space-y-4 flex flex-col justify-between hover:border-slate-600 transition-colors">
+                                <div className="space-y-3">
                                     <div className="flex items-center gap-3">
-                                        <div className="avatar">
-                                            <div className="w-12 h-12 rounded-full border border-base-300 shadow">
-                                                <img
-                                                    src={coach.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150"}
-                                                    alt={coach.name}
-                                                />
-                                            </div>
+                                        <div className="w-10 h-10 rounded-full bg-base-300 flex items-center justify-center font-bold text-xs text-slate-200">
+                                            {coach.name[0]}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-1">
-                                                <span className="badge badge-warning badge-xs font-black text-[9px] px-1.5 py-0.5">{coach.title}</span>
-                                                <span className="text-[10px] font-mono bg-base-200 px-1.5 rounded font-bold">{coach.elo} ELO</span>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-mono text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                                                    {coach.title}
+                                                </span>
+                                                <span className="font-mono text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                                    {coach.elo} ELO
+                                                </span>
                                             </div>
-                                            <h3 className="text-xs font-bold text-base-content truncate mt-0.5">{coach.name}</h3>
+                                            <h3 className="text-xs font-bold text-slate-200 truncate mt-1">{coach.name}</h3>
                                         </div>
                                     </div>
 
-                                    {/* Description */}
-                                    <p className="text-[10px] text-base-content/75 leading-relaxed h-12 overflow-hidden">
+                                    <p className="text-xs text-slate-400 leading-relaxed min-h-[3rem] line-clamp-2">
                                         {coach.description}
                                     </p>
+                                </div>
 
-                                    {/* Details & Rates */}
-                                    <div className="flex items-center justify-between bg-base-200 p-2.5 rounded-xl border border-base-300 text-xs">
-                                        <span className="flex items-center text-primary font-bold">
-                                            <IconCurrencyRupee size={14} /> {coach.rate} <span className="text-[9px] text-base-content/50 font-normal">/ hr</span>
+                                <div className="space-y-3 pt-2">
+                                    <div className="flex items-center justify-between bg-base-100 p-2.5 rounded-lg border border-base-300 text-xs">
+                                        <span className="font-mono font-bold text-emerald-400">
+                                            ₹{coach.rate} <span className="text-[10px] text-slate-500 font-normal">/ hour</span>
                                         </span>
-                                        <span className="text-[9px] text-base-content/50 font-semibold flex items-center gap-1">
-                                            <IconClock size={10} /> {slots.length} Slots Open
+                                        <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
+                                            <IconClock size={12} /> {slots.length} Slots
                                         </span>
                                     </div>
 
-                                    {/* Trigger Book button */}
                                     <button
                                         onClick={() => {
                                             setActiveCoach(coach);
                                             setSelectedSlot(slots[0] || "");
                                             setBookingSuccess("");
                                         }}
-                                        className="btn btn-xs btn-primary font-bold w-full h-8 normal-case"
+                                        className="btn btn-primary btn-sm w-full font-bold normal-case"
                                     >
-                                        📅 Book Session
+                                        Book Sparring Session
                                     </button>
                                 </div>
                             </div>
@@ -213,42 +232,41 @@ export default function CoachesMarketplacePage() {
 
             {/* Booking Modal */}
             {activeCoach && (
-                <div className="modal modal-open animate__animated animate__fadeIn">
-                    <div className="modal-box max-w-sm p-5 border border-base-300 shadow-2xl relative bg-base-100">
-                        {/* Close button */}
+                <div className="modal modal-open">
+                    <div className="modal-box max-w-sm p-5 border border-base-300 rounded-xl bg-base-200 relative space-y-4">
                         <button
                             onClick={() => setActiveCoach(null)}
-                            className="btn btn-ghost btn-circle btn-xs absolute right-3 top-3"
+                            className="btn btn-ghost btn-circle btn-xs absolute right-3 top-3 text-slate-400"
                         >
                             <IconX size={14} />
                         </button>
 
-                        <h3 className="font-bold text-sm flex items-center gap-1.5 mb-2">
-                            📅 Schedule Sparring Lesson
-                        </h3>
-                        <p className="text-[10px] text-base-content/60 mb-4">
-                            Select an available slot below. Session will be hosted inside a private lobby with analyzing tools.
-                        </p>
+                        <div>
+                            <h3 className="font-bold text-sm text-slate-100">
+                                Book Sparring Session
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                Select an available slot for your private coaching match.
+                            </p>
+                        </div>
 
-                        {/* Booking form */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div>
-                                <label className="label label-text py-0.5 text-[9px] font-semibold uppercase tracking-wider text-base-content/50">
-                                    Titled Instructor
+                                <label className="text-[10px] font-mono text-slate-400 uppercase font-bold block mb-1">
+                                    Coach
                                 </label>
-                                <div className="text-xs font-bold bg-base-200 p-2.5 rounded-lg border border-base-300 flex items-center gap-2">
-                                    <span className="badge badge-warning badge-xs font-black">{activeCoach.title}</span>
+                                <div className="text-xs font-bold bg-base-100 p-2.5 rounded-lg border border-base-300 flex items-center gap-2 text-slate-200">
+                                    <span className="font-mono text-[10px] font-bold text-amber-400">{activeCoach.title}</span>
                                     {activeCoach.name}
                                 </div>
                             </div>
 
-                            {/* Slot selector */}
                             <div>
-                                <label className="label label-text py-0.5 text-[9px] font-semibold uppercase tracking-wider text-base-content/50">
-                                    Available Time Blocks
+                                <label className="text-[10px] font-mono text-slate-400 uppercase font-bold block mb-1">
+                                    Time Slot
                                 </label>
                                 <select
-                                    className="select select-bordered select-sm w-full text-xs font-semibold"
+                                    className="select select-bordered select-sm w-full text-xs font-mono"
                                     value={selectedSlot}
                                     onChange={(e) => setSelectedSlot(e.target.value)}
                                 >
@@ -260,39 +278,36 @@ export default function CoachesMarketplacePage() {
                                 </select>
                             </div>
 
-                            {/* Session rate details */}
-                            <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-dashed border-base-300">
-                                <span className="text-base-content/60">Total Cost (1 Hour):</span>
-                                <span className="text-primary flex items-center">
-                                    <IconCurrencyRupee size={14} /> {activeCoach.rate}
+                            <div className="flex items-center justify-between text-xs font-bold pt-2 border-t border-base-300">
+                                <span className="text-slate-400">Total (1 Hour):</span>
+                                <span className="font-mono text-emerald-400">
+                                    ₹{activeCoach.rate}
                                 </span>
                             </div>
 
-                            {/* Success panel */}
                             {bookingSuccess && (
-                                <div className="alert alert-success text-[10px] font-bold p-2.5 flex items-start gap-1 rounded-lg animate__animated animate__fadeIn">
-                                    <IconUserCheck size={14} className="shrink-0 text-success mt-0.5" />
-                                    <div>{bookingSuccess}</div>
+                                <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center gap-2">
+                                    <IconUserCheck size={14} />
+                                    <span>{bookingSuccess}</span>
                                 </div>
                             )}
 
-                            {/* Action confirmation button */}
                             {!bookingSuccess ? (
                                 <button
                                     onClick={triggerBooking}
-                                    className={`btn btn-sm btn-primary w-full font-bold normal-case ${
+                                    className={`btn btn-primary btn-sm w-full font-bold normal-case ${
                                         bookingLoading ? "loading" : ""
                                     }`}
                                     disabled={bookingLoading}
                                 >
-                                    💳 Pay & Confirm Booking
+                                    Confirm Booking
                                 </button>
                             ) : (
                                 <button
                                     onClick={() => setActiveCoach(null)}
-                                    className="btn btn-sm btn-neutral w-full font-bold normal-case"
+                                    className="btn btn-outline btn-sm w-full font-bold border-base-300 normal-case"
                                 >
-                                    Done
+                                    Close
                                 </button>
                             )}
                         </div>

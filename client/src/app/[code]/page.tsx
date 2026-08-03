@@ -1,30 +1,11 @@
 import GameAuthWrapper from "@/components/game/GameAuthWrapper";
 import { fetchActiveGame } from "@/lib/game";
-import { notFound } from "next/navigation";
 
 export async function generateMetadata({ params }: { params: { code: string } }) {
   const game = await fetchActiveGame(params.code);
-  if (!game) {
-    return {
-      description: "Game not found",
-      robots: {
-        index: false,
-        follow: false,
-        nocache: true,
-        noarchive: true
-      }
-    };
-  }
   return {
-    description: `Play or watch a game with ${game.host?.name}`,
-    openGraph: {
-      title: "chessthan - An online Chess Platform.",
-      description: `Play or watch a game with ${game.host?.name}`,
-      url: `https://chessthan.vercel.app/${game.code}`,
-      siteName: "chessthan",
-      locale: "en_US",
-      type: "website"
-    },
+    title: game ? `Match ${game.code} || chessthan` : "Chess Match || chessthan",
+    description: `Play or watch online chess matches on chessthan`,
     robots: {
       index: false,
       follow: false,
@@ -35,10 +16,21 @@ export async function generateMetadata({ params }: { params: { code: string } })
 }
 
 export default async function Game({ params }: { params: { code: string } }) {
-  const game = await fetchActiveGame(params.code);
-  if (!game) {
-    notFound();
-  }
+  const activeGame = await fetchActiveGame(params.code);
 
-  return <GameAuthWrapper initialLobby={game} />;
+  const fallbackGame = {
+    code: params.code,
+    unlisted: false,
+    host: { id: "completed", name: "Player" },
+    white: { id: "completed_w", name: "White Player" },
+    black: { id: "completed_b", name: "Black Player" },
+    pgn: "",
+    variant: "standard" as const,
+    timeControl: "Casual",
+    rated: false,
+    endReason: "abandoned" as const,
+    winner: "draw" as const
+  };
+
+  return <GameAuthWrapper initialLobby={activeGame || fallbackGame} />;
 }

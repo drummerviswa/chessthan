@@ -93,9 +93,29 @@ export default function OpeningsTrainerPage() {
     const [moveIdx, setMoveIdx] = useState<number>(0);
     const [isCompleted, setIsCompleted] = useState<boolean>(false);
     const [warningMsg, setWarningMsg] = useState<string>("");
+    const [boardTheme, setBoardTheme] = useState({ dark: "#0e4a3b", light: "#eeeddf" });
 
     const track = OPENING_TRACKS[selectedTrackIdx];
     const playerSide = track.playerSide;
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const savedTheme = localStorage.getItem("chessthan:boardTheme");
+            if (savedTheme) {
+                const THEMES = [
+                    { id: "emerald", dark: "#0e4a3b", light: "#eeeddf" },
+                    { id: "wood", dark: "#b58863", light: "#f0d9b5" },
+                    { id: "glass", dark: "#5e81ac", light: "#eceff4" },
+                    { id: "slate", dark: "#475569", light: "#cbd5e1" },
+                    { id: "royal", dark: "#5b21b6", light: "#ede9fe" }
+                ];
+                const found = THEMES.find(t => t.id === savedTheme);
+                if (found) {
+                    setBoardTheme({ dark: found.dark, light: found.light });
+                }
+            }
+        }
+    }, []);
 
     // Reset game when changing tracks
     useEffect(() => {
@@ -207,10 +227,10 @@ export default function OpeningsTrainerPage() {
     const boardOrientation = playerSide === "w" ? "white" : "black";
 
     return (
-        <div className="flex flex-col lg:flex-row items-stretch gap-8 w-full max-w-5xl justify-center p-4">
+        <div className="flex flex-col lg:flex-row items-start lg:justify-center gap-8 w-full max-w-5xl p-4">
             
             {/* Left section: Chessboard */}
-            <div className="flex-1 flex flex-col items-center">
+            <div className="w-full max-w-[460px] flex flex-col items-center mx-auto lg:mx-0 shrink-0">
                 
                 {/* Board header */}
                 <div className="w-full flex items-center justify-between bg-base-200 border border-base-300 p-3 rounded-t-xl mb-1 text-xs">
@@ -224,13 +244,13 @@ export default function OpeningsTrainerPage() {
                 </div>
 
                 {/* Chessboard container */}
-                <div className="w-full max-w-[460px] h-[460px] shadow-2xl rounded-b-xl overflow-hidden bg-base-100 border border-base-300 relative">
+                <div className="w-full max-w-[460px] aspect-square shadow-2xl rounded-b-xl overflow-hidden bg-base-100 border border-base-300 relative">
                     <Chessboard
                         position={gameFen}
                         onPieceDrop={onDrop}
                         boardOrientation={boardOrientation}
-                        customDarkSquareStyle={{ backgroundColor: "#4b7399" }}
-                        customLightSquareStyle={{ backgroundColor: "#eae9d2" }}
+                        customDarkSquareStyle={{ backgroundColor: boardTheme.dark }}
+                        customLightSquareStyle={{ backgroundColor: boardTheme.light }}
                         customBoardStyle={{ borderRadius: "0 0 0.5rem 0.5rem" }}
                         arePiecesDraggable={!isCompleted}
                     />

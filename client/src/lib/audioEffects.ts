@@ -58,7 +58,7 @@ export const playSound = (type: "move" | "capture" | "check" | "win" | "loss" | 
             osc.stop(now + 0.12);
 
         } else if (type === "check") {
-            // High pitch alarm chime
+            // Sharp warning check bell/strike sound
             const osc1 = ctx.createOscillator();
             const osc2 = ctx.createOscillator();
             const gain = ctx.createGain();
@@ -67,21 +67,21 @@ export const playSound = (type: "move" | "capture" | "check" | "win" | "loss" | 
             osc2.connect(gain);
             gain.connect(ctx.destination);
 
-            osc1.type = "sine";
-            osc1.frequency.setValueAtTime(680, now);
-            osc1.frequency.linearRampToValueAtTime(880, now + 0.15);
+            osc1.type = "triangle";
+            osc1.frequency.setValueAtTime(320, now);
+            osc1.frequency.exponentialRampToValueAtTime(150, now + 0.15);
 
             osc2.type = "sine";
-            osc2.frequency.setValueAtTime(920, now);
-            osc2.frequency.linearRampToValueAtTime(1200, now + 0.15);
+            osc2.frequency.setValueAtTime(480, now);
+            osc2.frequency.exponentialRampToValueAtTime(220, now + 0.15);
 
-            gain.gain.setValueAtTime(0.1, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+            gain.gain.setValueAtTime(0.18, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
             osc1.start(now);
             osc2.start(now);
-            osc1.stop(now + 0.25);
-            osc2.stop(now + 0.25);
+            osc1.stop(now + 0.18);
+            osc2.stop(now + 0.18);
 
         } else if (type === "win") {
             // Major pentatonic victory sound

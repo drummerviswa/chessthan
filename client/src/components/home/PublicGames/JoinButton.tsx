@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { IconSwords } from "@tabler/icons-react";
 
-export default function JoinButton({ code }: { code: string }) {
+export default function JoinButton({ code, isFull = false }: { code: string; isFull?: boolean }) {
   const router = useRouter();
   const [isLoading, startTransition] = useTransition();
 
@@ -15,13 +16,16 @@ export default function JoinButton({ code }: { code: string }) {
 
   return (
     <button
-      className={
-        "btn btn-ghost btn-xs focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100" +
-        (isLoading ? " btn-disabled" : "")
-      }
+      className={`btn btn-xs font-bold gap-1 px-3 border-0 transition-all ${
+        isFull
+          ? "bg-slate-700 text-slate-300 hover:bg-slate-600"
+          : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm"
+      } ${isLoading ? "loading" : ""}`}
       onClick={handleJoin}
+      disabled={isLoading}
     >
-      Join
+      <IconSwords size={12} />
+      {isLoading ? "Connecting..." : isFull ? "Spectate" : "Join Match"}
     </button>
   );
 }

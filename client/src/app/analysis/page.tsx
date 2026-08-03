@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { evaluateBoard } from "@/lib/localEngine";
@@ -18,14 +19,62 @@ import {
 } from "@tabler/icons-react";
 
 const BOARD_THEMES = [
-    { id: "emerald", name: "Emerald Green", dark: "#4b7399", light: "#eae9d2" },
+    { id: "emerald", name: "Emerald Green", dark: "#0e4a3b", light: "#eeeddf" },
     { id: "wood", name: "Walnut Wood", dark: "#b58863", light: "#f0d9b5" },
     { id: "glass", name: "Ice Blue", dark: "#5e81ac", light: "#eceff4" },
     { id: "slate", name: "Slate Dark", dark: "#475569", light: "#cbd5e1" },
     { id: "royal", name: "Royal Purple", dark: "#5b21b6", light: "#ede9fe" }
 ];
 
-export default function AnalysisPage() {
+const fetchStockfishCloudLines = async (fen: string): Promise<{ score: number | null, pvs: any[] }> => {
+    try {
+        const res = await fetch(`https://eval.lichess.org/api?fen=${encodeURIComponent(fen)}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.pvs) {
+                let score: number | null = null;
+                if (data.pvs.length > 0) {
+                    const bestPv = data.pvs[0];
+                    score = bestPv.mate !== undefined ? (bestPv.mate > 0 ? 99 : -99) : bestPv.cp / 100;
+                }
+                return { score, pvs: data.pvs };
+            }
+        }
+    } catch (err) {
+        console.error("Cloud Stockfish eval fetch error:", err);
+    }
+    return { score: null, pvs: [] };
+};
+
+const fetchStockfishOnlineLines = async (fen: string): Promise<{ score: number | null, pvs: any[] }> => {
+    try {
+        const res = await fetch(`https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.success) {
+                let score: number | null = null;
+                if (data.mate !== null && data.mate !== undefined) {
+                    score = data.mate > 0 ? 99 : -99;
+                } else if (data.evaluation !== null && data.evaluation !== undefined) {
+                    score = data.evaluation;
+                }
+                
+                const continuation = data.continuation ? data.continuation.split(" ") : [];
+                const pvs = [{
+                    cp: score !== null ? score * 100 : 0,
+                    mate: data.mate ?? undefined,
+                    moves: continuation
+                }];
+                return { score, pvs };
+            }
+        }
+    } catch (err) {
+        console.error("Cloud Stockfish Online API fetch error:", err);
+    }
+    return { score: null, pvs: [] };
+};
+
+function AnalysisBoardComponent() {
     const [game, setGame] = useState<Chess>(new Chess());
     const [gameFen, setGameFen] = useState(game.fen());
     const [history, setHistory] = useState<any[]>([]);
@@ -33,6 +82,26 @@ export default function AnalysisPage() {
     
     // Evaluation scores
     const [evalScore, setEvalScore] = useState<number>(0);
+    const [evalLines, setEvalLines] = useState<any[]>([]);
+    const [engineMode, setEngineMode] = useState<"local" | "stockfish" | "stockfish-online">("local");
+    const [isCloudLoading, setIsCloudLoading] = useState<boolean>(false);
+
+    const getEngineArrows = () => {
+        if (engineMode === "local" || evalLines.length === 0) return [];
+        const colors = [
+            "rgba(34, 197, 94, 0.8)",  // Green for line #1
+            "rgba(56, 189, 248, 0.7)", // Blue for line #2
+            "rgba(249, 115, 22, 0.6)"  // Orange for line #3
+        ];
+        
+        return evalLines.slice(0, 3).map((pv, idx) => {
+            if (!pv.moves || pv.moves.length === 0) return null;
+            const uciMove = pv.moves[0];
+            const from = uciMove.slice(0, 2);
+            const to = uciMove.slice(2, 4);
+            return [from, to, colors[idx]];
+        }).filter(Boolean) as [string, string, string][];
+    };
     
     // Openings explorer state
     const [currentOpening, setCurrentOpening] = useState<any>(null);
@@ -51,6 +120,26 @@ export default function AnalysisPage() {
     // Selection/Dot highlights
     const [optionSquares, setOptionSquares] = useState<any>({});
     const [moveFrom, setMoveFrom] = useState<string>("");
+
+    const searchParams = useSearchParams();
+    const pgnParam = searchParams.get("pgn");
+
+    // Load PGN from query parameter if present
+    useEffect(() => {
+        if (pgnParam) {
+            try {
+                const decodedPgn = decodeURIComponent(pgnParam);
+                const temp = new Chess();
+                temp.loadPgn(decodedPgn);
+                setGame(temp);
+                setGameFen(temp.fen());
+                setHistory(temp.history({ verbose: true }));
+                setNavIndex(temp.history().length - 1);
+            } catch (e) {
+                console.error("Failed to load PGN from URL param:", e);
+            }
+        }
+    }, [pgnParam]);
 
     // Load theme setting from localStorage on mount
     useEffect(() => {
@@ -74,9 +163,36 @@ export default function AnalysisPage() {
 
     // Calculate real-time evaluation score
     useEffect(() => {
-        const scoreVal = evaluateBoard(game);
-        setEvalScore(scoreVal / 100);
-    }, [gameFen]);
+        if (engineMode === "local") {
+            const scoreVal = evaluateBoard(game);
+            setEvalScore(scoreVal / 100);
+            setEvalLines([]);
+        } else if (engineMode === "stockfish") {
+            setIsCloudLoading(true);
+            fetchStockfishCloudLines(gameFen).then(({ score, pvs }) => {
+                if (score !== null) {
+                    setEvalScore(score);
+                } else {
+                    const scoreVal = evaluateBoard(game);
+                    setEvalScore(scoreVal / 100);
+                }
+                setEvalLines(pvs || []);
+                setIsCloudLoading(false);
+            });
+        } else if (engineMode === "stockfish-online") {
+            setIsCloudLoading(true);
+            fetchStockfishOnlineLines(gameFen).then(({ score, pvs }) => {
+                if (score !== null) {
+                    setEvalScore(score);
+                } else {
+                    const scoreVal = evaluateBoard(game);
+                    setEvalScore(scoreVal / 100);
+                }
+                setEvalLines(pvs || []);
+                setIsCloudLoading(false);
+            });
+        }
+    }, [gameFen, engineMode]);
 
     // Track active opening book name and statistics
     useEffect(() => {
@@ -212,6 +328,32 @@ export default function AnalysisPage() {
         setMoveFrom("");
     };
 
+    // Keyboard Navigation Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: any) => {
+            if (
+                document.activeElement?.tagName === "INPUT" ||
+                document.activeElement?.tagName === "TEXTAREA"
+            ) {
+                return;
+            }
+
+            if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                navigateHistory(navIndex - 1);
+            } else if (e.key === "ArrowRight") {
+                e.preventDefault();
+                navigateHistory(navIndex + 1);
+            } else if (e.key === " ") {
+                e.preventDefault();
+                setBoardOrientation((prev) => prev === "white" ? "black" : "white");
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [navIndex, history, boardOrientation]);
+
     // Trigger AI coach description
     const explainActivePosition = async () => {
         if (history.length === 0) return;
@@ -303,37 +445,57 @@ export default function AnalysisPage() {
     const formattedScore = evalScore > 0 ? `+${evalScore.toFixed(1)}` : evalScore.toFixed(1);
 
     return (
-        <div className="flex flex-col lg:flex-row items-stretch gap-8 w-full max-w-5xl justify-center p-4">
+        <div className="flex flex-col lg:flex-row items-start lg:justify-center gap-8 w-full max-w-5xl p-4">
             
             {/* Left section: Evaluation bar & Chessboard */}
-            <div className="flex-1 flex flex-col items-center">
+            <div className="w-full max-w-[480px] flex flex-col items-center mx-auto lg:mx-0 shrink-0">
                 
                 {/* Board header */}
                 <div className="w-full flex items-center justify-between bg-base-200 border border-base-300 p-3 rounded-t-xl mb-1 text-xs">
-                    <span className="font-bold flex items-center gap-1">
+                    <span className="font-bold flex items-center gap-1.5">
                         <span className="badge badge-primary badge-xs">Evaluation</span>
-                        {formattedScore}
+                        {isCloudLoading ? (
+                            <span className="loading loading-spinner w-3 h-3 text-primary"></span>
+                        ) : (
+                            <span>{formattedScore}</span>
+                        )}
                     </span>
                     
-                    {/* Theme selector */}
-                    <div className="flex items-center gap-1">
-                        <IconBrush size={14} className="text-base-content/40" />
-                        <select
-                            className="select select-ghost select-xs text-[10px] font-bold py-0"
-                            value={selectedTheme.id}
-                            onChange={(e) => handleThemeChange(e.target.value)}
-                        >
-                            {BOARD_THEMES.map(theme => (
-                                <option key={theme.id} value={theme.id}>
-                                    {theme.name}
-                                </option>
-                            ))}
-                        </select>
+                    <div className="flex items-center gap-3">
+                        {/* Engine Selector */}
+                        <div className="flex items-center gap-1">
+                            <span className="text-[9px] uppercase font-extrabold text-base-content/50">Engine:</span>
+                             <select
+                                 className="select select-bordered select-xs text-[9px] font-bold py-0 h-6 min-h-6 rounded-lg bg-base-100"
+                                 value={engineMode}
+                                 onChange={(e: any) => setEngineMode(e.target.value)}
+                             >
+                                 <option value="local">🤖 Local Minimax</option>
+                                 <option value="stockfish">⚡ Lichess Cloud</option>
+                                 <option value="stockfish-online">🌐 Stockfish.online API</option>
+                             </select>
+                        </div>
+
+                        {/* Theme selector */}
+                        <div className="flex items-center gap-1">
+                            <IconBrush size={14} className="text-base-content/40" />
+                            <select
+                                className="select select-ghost select-xs text-[10px] font-bold py-0"
+                                value={selectedTheme.id}
+                                onChange={(e) => handleThemeChange(e.target.value)}
+                            >
+                                {BOARD_THEMES.map(theme => (
+                                    <option key={theme.id} value={theme.id}>
+                                        {theme.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
 
                 {/* Eval Bar + Chessboard Row */}
-                <div className="w-full flex gap-3 h-[460px] max-w-[460px] lg:max-w-none">
+                <div className="w-full flex gap-3 aspect-square mb-1">
                     
                     {/* Evaluation Bar */}
                     <div className="w-5 bg-black border border-base-300 rounded-lg overflow-hidden flex flex-col relative h-full shrink-0">
@@ -365,12 +527,13 @@ export default function AnalysisPage() {
                             customDarkSquareStyle={{ backgroundColor: selectedTheme.dark }}
                             customLightSquareStyle={{ backgroundColor: selectedTheme.light }}
                             customBoardStyle={{ borderRadius: "0.5rem" }}
+                            customArrows={getEngineArrows() as any}
                         />
                     </div>
                 </div>
 
                 {/* Sub-board controls */}
-                <div className="w-full max-w-[460px] flex items-center justify-between bg-base-200 border border-base-300 rounded-b-xl mt-1 p-2">
+                <div className="w-full flex items-center justify-between bg-base-200 border border-base-300 rounded-b-xl p-2">
                     <div className="flex gap-1">
                         <button
                             onClick={() => navigateHistory(-1)}
@@ -448,6 +611,40 @@ export default function AnalysisPage() {
                 ) : (
                     <div className="card bg-base-100 border border-base-300 shadow-xl shrink-0 p-4 text-[10px] text-center text-base-content/30 font-medium">
                         Play moves on the board to view the Opening Book explorer.
+                    </div>
+                )}
+
+                {/* Section: Stockfish Engine Lines */}
+                {(engineMode === "stockfish" || engineMode === "stockfish-online") && evalLines.length > 0 && (
+                    <div className="card bg-base-100 border border-base-300 shadow-xl animate__animated animate__fadeIn shrink-0">
+                        <div className="card-body p-4 space-y-2">
+                            <h3 className="text-[10px] font-bold uppercase tracking-wider text-base-content/40">
+                                {engineMode === "stockfish-online" ? "Stockfish Online Lines" : "Stockfish Engine Lines"}
+                            </h3>
+                            <div className="space-y-2">
+                                {evalLines.slice(0, 3).map((pv, idx) => {
+                                    const score = pv.mate !== undefined 
+                                        ? `M${pv.mate}` 
+                                        : `${pv.cp > 0 ? "+" : ""}${(pv.cp / 100).toFixed(1)}`;
+                                    const moveSequence = pv.moves.slice(0, 4).join(" ");
+                                    const colors = ["text-success", "text-info", "text-warning"];
+                                    
+                                    return (
+                                        <div key={idx} className="text-xs flex flex-col bg-base-200 p-2 rounded-lg border border-base-300">
+                                            <div className="flex justify-between items-center font-bold">
+                                                <span className={`${colors[idx]} flex items-center gap-1`}>
+                                                    #{idx + 1} Line
+                                                </span>
+                                                <span className="font-mono text-[10px]">{score}</span>
+                                            </div>
+                                            <span className="text-[10px] text-base-content/60 font-mono mt-0.5 truncate">
+                                                {moveSequence}...
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -543,5 +740,17 @@ export default function AnalysisPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function AnalysisPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <span className="loading loading-spinner loading-lg text-primary animate-pulse"></span>
+            </div>
+        }>
+            <AnalysisBoardComponent />
+        </Suspense>
     );
 }

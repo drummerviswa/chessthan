@@ -5,5 +5,8 @@ router.route("/leaderboard/elo").get(controller.getEloLeaderboard);
 router.route("/leaderboard/leagues").get(controller.getLeagueLeaderboard);
 router.route("/coaches/list").get(controller.listCoaches);
 router.route("/coaches/book").post(controller.bookCoachSession);
+router.route("/friends/list").get(controller.getFriendsList);
+router.route("/friends/add").post(controller.sendFriendRequest);
+router.route("/chesscom/:username").get(controller.syncChessComStats);
 router.route("/:name").get(controller.getUserProfile);
 export default router;

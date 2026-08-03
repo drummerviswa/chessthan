@@ -63,7 +63,7 @@ export const findByNameEmail = async (
             const users = await prisma.user.findMany({
                 take: limit ?? 10
             });
-            return users.map(u => ({
+            return users.map((u: any) => ({
                 id: u.id,
                 name: u.name,
                 email: u.email || undefined,
@@ -93,7 +93,7 @@ export const findByNameEmail = async (
             take: limit ?? 1
         });
 
-        return users.map(u => ({
+        return users.map((u: any) => ({
             id: u.id,
             name: u.name,
             email: u.email || undefined,

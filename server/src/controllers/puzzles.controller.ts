@@ -164,3 +164,30 @@ export const solvePuzzle = async (req: Request, res: Response) => {
         res.status(500).json({ message: "Internal server error" });
     }
 };
+
+/**
+ * Admin: Create custom tactical puzzle
+ */
+export const createPuzzle = async (req: Request, res: Response) => {
+    try {
+        const { fen, moves, rating, theme } = req.body;
+        if (!fen || !moves || !rating) {
+            res.status(400).json({ message: "fen, moves, and rating are required." });
+            return;
+        }
+
+        const newPuzzle = await prisma.puzzle.create({
+            data: {
+                fen: xss(fen),
+                moves: xss(moves),
+                rating: Number(rating),
+                theme: theme ? xss(theme) : "Custom Tactic"
+            }
+        });
+
+        res.status(201).json({ message: "Puzzle created successfully!", puzzle: newPuzzle });
+    } catch (err: unknown) {
+        console.error("createPuzzle error:", err);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};

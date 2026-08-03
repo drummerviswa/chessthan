@@ -24,6 +24,10 @@ export const save = async (game: Game) => {
             }
         }
 
+        const validStartedAt = (game.startedAt && !isNaN(new Date(game.startedAt as number).getTime()))
+            ? new Date(game.startedAt as number)
+            : new Date();
+
         const newGame = await prisma.game.create({
             data: {
                 winner: game.winner || null,
@@ -33,7 +37,7 @@ export const save = async (game: Game) => {
                 whiteName: game.white?.name || null,
                 blackId: black.id || null,
                 blackName: game.black?.name || null,
-                startedAt: new Date(game.startedAt as number)
+                startedAt: validStartedAt
             }
         });
 
@@ -219,7 +223,7 @@ export const findByUserId = async (id: number, limit = 10) => {
             take: limit
         });
 
-        return games.map((game) => {
+        return games.map((game: any) => {
             return {
                 id: game.id,
                 winner: game.winner || undefined,

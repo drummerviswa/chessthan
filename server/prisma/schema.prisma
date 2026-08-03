@@ -36,6 +36,8 @@ model User {
   eloHistory    EloHistory[]
   puzzleHistory UserPuzzleHistory[]
   coachProfile  CoachProfile?
+  sentFriendships     Friendship[] @relation("UserFriends")
+  receivedFriendships Friendship[] @relation("FriendUsers")
 
   @@map("user")
 }
@@ -107,4 +109,18 @@ model CoachProfile {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("coach_profile")
+}
+
+model Friendship {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  friendId    Int      @map("friend_id")
+  status      String   @default("pending") @db.VarChar(16) // "pending", "accepted", "blocked"
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User     @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend      User     @relation("FriendUsers", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@map("friendship")
 }

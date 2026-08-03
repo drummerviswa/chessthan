@@ -54,20 +54,21 @@ export default function JoinGame() {
 
   return (
     <form
-      className={"flex items-center justify-center input-group" + (notFound ? " tooltip tooltip-error tooltip-open" : "")}
+      className={"flex gap-2 w-full" + (notFound ? " tooltip tooltip-error tooltip-open" : "")}
       data-tip="error: game not found"
       onSubmit={submitJoinGame}
     >
       <input
         type="text"
-        placeholder="Invite link or code"
-        className="input input-bordered"
+        placeholder="Invite link or code..."
+        className="input input-bordered input-sm flex-grow rounded-xl bg-base-200 border-base-300 font-mono text-xs focus:border-primary focus:outline-none"
         name="joinGameCode"
         id="joinGameCode"
+        required
       />
       <button
         className={
-          "btn" +
+          "btn btn-sm btn-primary font-bold rounded-xl normal-case" +
           (buttonLoading ? " loading" : "") +
           (!session?.user?.id ? " btn-disabled text-base-content" : "")
         }

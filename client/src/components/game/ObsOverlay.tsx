@@ -133,8 +133,8 @@ export default function ObsOverlay({ gameCode }: ObsOverlayProps) {
                             boardOrientation={orientation}
                             arePiecesDraggable={false}
                             customSquareStyles={lastMove}
-                            customDarkSquareStyle={{ backgroundColor: "#4b7399" }}
-                            customLightSquareStyle={{ backgroundColor: "#eae9d2" }}
+                            customDarkSquareStyle={{ backgroundColor: "#0e4a3b" }}
+                            customLightSquareStyle={{ backgroundColor: "#eeeddf" }}
                         />
                     </div>
 

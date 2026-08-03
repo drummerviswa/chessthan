@@ -20,6 +20,9 @@ export const save = async (game) => {
                 black.name = game.black.name || undefined;
             }
         }
+        const validStartedAt = (game.startedAt && !isNaN(new Date(game.startedAt).getTime()))
+            ? new Date(game.startedAt)
+            : new Date();
         const newGame = await prisma.game.create({
             data: {
                 winner: game.winner || null,
@@ -29,7 +32,7 @@ export const save = async (game) => {
                 whiteName: game.white?.name || null,
                 blackId: black.id || null,
                 blackName: game.black?.name || null,
-                startedAt: new Date(game.startedAt)
+                startedAt: validStartedAt
             }
         });
         // Update player stats if registered users

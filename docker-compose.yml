@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: chessthan_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_DB: chessthan
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: chessthan_server
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: postgres_password
+      PGDATABASE: chessthan
+      PGPORT: 5432
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/chessthan
+      CORS_ORIGIN: http://localhost:3000
+      SESSION_SECRET: production_session_secret_key_change_me
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:5000
+    container_name: chessthan_client
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:5000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:
