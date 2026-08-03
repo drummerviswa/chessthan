@@ -1,5 +1,5 @@
 import { io } from "../server.js";
-import { chat, claimAbandoned, getLatestGame, joinAsPlayer, joinLobby, leaveLobby, sendMove, resignMatch, offerDraw, acceptDraw, abortMatch } from "./game.socket.js";
+import { chat, claimAbandoned, getLatestGame, joinAsPlayer, joinLobby, leaveLobby, sendMove, resignMatch, offerDraw, acceptDraw, abortMatch, claimTimeout } from "./game.socket.js";
 const socketConnect = (socket) => {
     const req = socket.request;
     socket.use((__, next) => {
@@ -36,6 +36,7 @@ const socketConnect = (socket) => {
     socket.on("joinAsPlayer", joinAsPlayer);
     socket.on("chat", chat);
     socket.on("claimAbandoned", claimAbandoned);
+    socket.on("claimTimeout", claimTimeout);
     socket.on("resignMatch", resignMatch);
     socket.on("offerDraw", offerDraw);
     socket.on("acceptDraw", acceptDraw);

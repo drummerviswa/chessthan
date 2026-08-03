@@ -237,6 +237,22 @@ export async function claimAbandoned(type) {
         clearTimeout(game.turnTimer);
     activeGames.splice(activeGames.indexOf(game), 1);
 }
+export async function claimTimeout() {
+    const game = activeGames.find((g) => g.code === Array.from(this.rooms)[1]);
+    if (!game || !game.clocks || game.endReason || game.winner)
+        return;
+    const chess = new Chess();
+    if (game.pgn)
+        chess.loadPgn(game.pgn);
+    else if (game.initialFen)
+        chess.load(game.initialFen);
+    const activeTurn = chess.turn();
+    const elapsed = Date.now() - game.clocks.lastMoveTime;
+    const remainingTime = activeTurn === "w" ? game.clocks.white - elapsed : game.clocks.black - elapsed;
+    if (remainingTime <= 0) {
+        await handleTimeoutLoss(game, activeTurn);
+    }
+}
 // eslint-disable-next-line no-unused-vars
 export async function getLatestGame() {
     const game = activeGames.find((g) => g.code === Array.from(this.rooms)[1]);

@@ -60,6 +60,13 @@ export function initSocket(
         });
     });
 
+    socket.on("clockSync", (clocks: { white: number; black: number; lastMoveTime: number }) => {
+        actions.updateLobby({
+            type: "updateLobby",
+            payload: { clocks }
+        });
+    });
+
     socket.on(
         "gameOver",
         ({
@@ -77,7 +84,9 @@ export function initSocket(
                 author: { name: "server" }
             } as Message;
 
-            if (reason === "abandoned") {
+            if (reason === "timeout") {
+                m.message = `${winnerName} (${winnerSide}) won on time! Opponent's clock expired.`;
+            } else if (reason === "abandoned") {
                 if (!winnerSide) {
                     m.message = `${winnerName} has claimed a draw due to abandonment.`;
                 } else {

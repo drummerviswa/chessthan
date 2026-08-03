@@ -12,7 +12,8 @@ import {
     resignMatch,
     offerDraw,
     acceptDraw,
-    abortMatch
+    abortMatch,
+    claimTimeout
 } from "./game.socket.js";
 
 const socketConnect = (socket: Socket) => {
@@ -56,6 +57,7 @@ const socketConnect = (socket: Socket) => {
     socket.on("joinAsPlayer", joinAsPlayer);
     socket.on("chat", chat);
     socket.on("claimAbandoned", claimAbandoned);
+    socket.on("claimTimeout", claimTimeout);
     socket.on("resignMatch", resignMatch);
     socket.on("offerDraw", offerDraw);
     socket.on("acceptDraw", acceptDraw);

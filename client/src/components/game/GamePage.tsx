@@ -65,11 +65,14 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
       const activeTurn = lobby.actualGame.turn(); // 'w' or 'b'
       const elapsed = Date.now() - lobby.clocks!.lastMoveTime;
 
-      setClocks(() => {
-        const whiteTime = activeTurn === "w" ? Math.max(0, lobby.clocks!.white - elapsed) : lobby.clocks!.white;
-        const blackTime = activeTurn === "b" ? Math.max(0, lobby.clocks!.black - elapsed) : lobby.clocks!.black;
-        return { white: whiteTime, black: blackTime };
-      });
+      const whiteTime = activeTurn === "w" ? Math.max(0, lobby.clocks!.white - elapsed) : lobby.clocks!.white;
+      const blackTime = activeTurn === "b" ? Math.max(0, lobby.clocks!.black - elapsed) : lobby.clocks!.black;
+
+      setClocks({ white: whiteTime, black: blackTime });
+
+      if ((whiteTime <= 0 || blackTime <= 0) && socket.connected) {
+        socket.emit("claimTimeout");
+      }
     }, 100);
 
     return () => clearInterval(interval);
