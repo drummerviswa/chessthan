@@ -27,6 +27,15 @@ export function initSocket(
     }
     // TODO: handle disconnect
 
+    // Authoritative side assignment from server — no client-side ID guessing needed
+    socket.on("yourSide", (side: "w" | "b" | "s") => {
+        actions.updateLobby({ type: "setSide", payload: side });
+        // Persist so page refreshes restore the correct board orientation
+        if (typeof window !== "undefined" && side !== "s") {
+            localStorage.setItem(`chessthan:side:${lobby.code}`, side);
+        }
+    });
+
     socket.on("chat", (message: Message) => {
         actions.addMessage(message);
     });

@@ -157,6 +157,19 @@ export async function joinLobby(this: Socket, gameCode: string) {
     }
 
     await this.join(gameCode);
+
+    // Tell THIS socket exactly which side they are (read AFTER slot assignment)
+    const finalWId = game.white?.id !== undefined ? String(game.white.id) : "";
+    const finalBId = game.black?.id !== undefined ? String(game.black.id) : "";
+
+    if (uId && finalWId && uId === finalWId) {
+        this.emit("yourSide", "w");
+    } else if (uId && finalBId && uId === finalBId) {
+        this.emit("yourSide", "b");
+    } else if (game.white && game.black) {
+        this.emit("yourSide", "s"); // spectator — both slots filled by others
+    }
+
     io.to(game.code as string).emit("receivedLatestGame", game);
 }
 

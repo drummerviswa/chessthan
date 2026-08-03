@@ -307,6 +307,14 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
       setBoardWidth(Math.min(targetWidth, maxHeightBased));
     };
 
+    // Restore side from localStorage on page refresh (set by yourSide socket event)
+    const storedSide = typeof window !== "undefined"
+      ? localStorage.getItem(`chessthan:side:${initialLobby.code}`) as "w" | "b" | null
+      : null;
+    if (storedSide) {
+      updateLobby({ type: "setSide", payload: storedSide });
+    }
+
     socket.connect();
     window.addEventListener("resize", handleResize);
     handleResize();
@@ -316,8 +324,6 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     }
 
     initSocket(
-      // Pass a live getter so the socket callbacks always see the current user
-      // (avoids stale closure capturing undefined session at mount time)
       () => session?.user ?? null,
       socket,
       lobby,
@@ -332,13 +338,12 @@ export default function GamePage({ initialLobby }: { initialLobby: Game }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-run syncSide whenever session resolves (handles late-loading guest sessions)
+  // Fallback: re-run syncSide when session resolves (only if server yourSide hasn't set it yet)
   useEffect(() => {
-    if (!session?.user) return;
+    if (!session?.user || lobby.side !== "s") return;
     syncSide(session.user, undefined, lobby, { updateLobby });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id]);
-
 
 
   // auto scroll down when new message is added
