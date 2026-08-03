@@ -39,14 +39,30 @@ const fetchStockfishCloudLines = async (fen: string): Promise<{ score: number | 
                 let score: number | null = null;
                 if (data.pvs.length > 0) {
                     const bestPv = data.pvs[0];
-                    score = bestPv.mate !== undefined ? (bestPv.mate > 0 ? 99 : -99) : bestPv.cp / 100;
+                    score = bestPv.mate !== undefined ? (bestPv.mate > 0 ? 99 : -99) : (bestPv.cp !== undefined ? bestPv.cp / 100 : 0);
                 }
-                return { score, pvs: data.pvs };
+                const formattedPvs = data.pvs.map((pv: any) => ({
+                    ...pv,
+                    moves: typeof pv.moves === "string" ? pv.moves.split(" ") : (pv.moves || [])
+                }));
+                return { score, pvs: formattedPvs };
             }
         }
     } catch (err) {
-        console.error("Cloud Stockfish eval fetch error:", err);
+        console.error("Cloud Stockfish Lichess fetch error, trying proxy fallback:", err);
     }
+
+    // Backend proxy fallback
+    try {
+        const proxyRes = await fetch(`${API_URL}/v1/games/stockfish?fen=${encodeURIComponent(fen)}`);
+        if (proxyRes.ok) {
+            const data = await proxyRes.json();
+            if (data && data.pvs) return data;
+        }
+    } catch (e) {
+        console.error("Stockfish proxy error:", e);
+    }
+
     return { score: null, pvs: [] };
 };
 
@@ -63,18 +79,35 @@ const fetchStockfishOnlineLines = async (fen: string): Promise<{ score: number |
                     score = data.evaluation;
                 }
                 
-                const continuation = data.continuation ? data.continuation.split(" ") : [];
+                let moves: string[] = [];
+                if (typeof data.data === "string") {
+                    const parts = data.data.split(" ");
+                    moves = parts.filter((p: string) => p !== "bestmove" && p !== "ponder" && p.length >= 4);
+                }
+
                 const pvs = [{
-                    cp: score !== null ? score * 100 : 0,
+                    cp: score !== null ? Math.round(score * 100) : 0,
                     mate: data.mate ?? undefined,
-                    moves: continuation
+                    moves
                 }];
                 return { score, pvs };
             }
         }
     } catch (err) {
-        console.error("Cloud Stockfish Online API fetch error:", err);
+        console.error("Cloud Stockfish Online API fetch error, trying proxy fallback:", err);
     }
+
+    // Backend proxy fallback
+    try {
+        const proxyRes = await fetch(`${API_URL}/v1/games/stockfish?fen=${encodeURIComponent(fen)}`);
+        if (proxyRes.ok) {
+            const data = await proxyRes.json();
+            if (data && data.pvs) return data;
+        }
+    } catch (e) {
+        console.error("Stockfish proxy error:", e);
+    }
+
     return { score: null, pvs: [] };
 };
 
@@ -91,7 +124,7 @@ function AnalysisBoardComponent() {
     const [isCloudLoading, setIsCloudLoading] = useState<boolean>(false);
 
     const getEngineArrows = () => {
-        if (engineMode === "local" || evalLines.length === 0) return [];
+        if (!evalLines || evalLines.length === 0) return [];
         const colors = [
             "rgba(34, 197, 94, 0.8)",  // Green for line #1
             "rgba(56, 189, 248, 0.7)", // Blue for line #2
@@ -99,8 +132,11 @@ function AnalysisBoardComponent() {
         ];
         
         return evalLines.slice(0, 3).map((pv, idx) => {
-            if (!pv.moves || pv.moves.length === 0) return null;
-            const uciMove = pv.moves[0];
+            if (!pv || !pv.moves) return null;
+            const movesArr = typeof pv.moves === "string" ? pv.moves.split(" ") : pv.moves;
+            if (!Array.isArray(movesArr) || movesArr.length === 0) return null;
+            const uciMove = movesArr[0];
+            if (typeof uciMove !== "string" || uciMove.length < 4) return null;
             const from = uciMove.slice(0, 2);
             const to = uciMove.slice(2, 4);
             return [from, to, colors[idx]];
@@ -186,15 +222,17 @@ function generateLocalEngineLines(g: Chess): Array<{ cp: number; moves: string[]
         const temp = new Chess(g.fen());
         temp.move(m.san);
         const cp = evaluateBoard(temp);
-        const nextMoves = temp.moves({ verbose: true }).slice(0, 4).map(n => n.san);
+        const uciMove = m.from + m.to + (m.promotion || "");
+        const nextMoves = temp.moves({ verbose: true }).slice(0, 4).map(n => n.from + n.to + (n.promotion || ""));
         return {
             cp: g.turn() === "w" ? cp : -cp,
-            moves: [m.san, ...nextMoves]
+            moves: [uciMove, ...nextMoves]
         };
     });
 
     return lines.sort((a, b) => b.cp - a.cp);
 }
+
 
     // Calculate real-time evaluation score & best lines
     useEffect(() => {

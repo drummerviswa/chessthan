@@ -175,3 +175,72 @@ export const reviewFinishedGame = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 };
+export const getStockfishEval = async (req, res) => {
+    try {
+        const fen = (req.query.fen || (req.body && req.body.fen) || "").trim();
+        if (!fen) {
+            res.status(400).json({ message: "fen parameter is required" });
+            return;
+        }
+        // 1. Try Lichess Cloud API
+        try {
+            const lichessRes = await fetch(`https://eval.lichess.org/api?fen=${encodeURIComponent(fen)}`);
+            if (lichessRes.ok) {
+                const data = await lichessRes.json();
+                if (data && data.pvs) {
+                    const pvs = data.pvs.map((pv) => ({
+                        cp: pv.cp ?? 0,
+                        mate: pv.mate ?? undefined,
+                        moves: typeof pv.moves === "string" ? pv.moves.split(" ") : (pv.moves || [])
+                    }));
+                    let score = null;
+                    if (pvs.length > 0) {
+                        const bestPv = pvs[0];
+                        score = bestPv.mate !== undefined ? (bestPv.mate > 0 ? 99 : -99) : bestPv.cp / 100;
+                    }
+                    res.status(200).json({ score, pvs });
+                    return;
+                }
+            }
+        }
+        catch (e) {
+            // fallback to stockfish online
+        }
+        // 2. Try Stockfish Online API
+        try {
+            const sfRes = await fetch(`https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}`);
+            if (sfRes.ok) {
+                const data = await sfRes.json();
+                if (data && data.success) {
+                    let score = null;
+                    if (data.mate !== null && data.mate !== undefined) {
+                        score = data.mate > 0 ? 99 : -99;
+                    }
+                    else if (data.evaluation !== null && data.evaluation !== undefined) {
+                        score = data.evaluation;
+                    }
+                    let moves = [];
+                    if (typeof data.data === "string") {
+                        const parts = data.data.split(" ");
+                        moves = parts.filter((p) => p !== "bestmove" && p !== "ponder" && p.length >= 4);
+                    }
+                    const pvs = [{
+                            cp: score !== null ? Math.round(score * 100) : 0,
+                            mate: data.mate ?? undefined,
+                            moves
+                        }];
+                    res.status(200).json({ score, pvs });
+                    return;
+                }
+            }
+        }
+        catch (e) {
+            // fallback
+        }
+        res.status(200).json({ score: null, pvs: [] });
+    }
+    catch (err) {
+        console.error("getStockfishEval controller error:", err);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
