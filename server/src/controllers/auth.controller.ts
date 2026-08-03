@@ -32,7 +32,7 @@ export const guestSession = async (req: Request, res: Response) => {
         }
         const name = xss(req.body.name);
 
-        const pattern = /^[A-Za-z0-9]+$/;
+        const pattern = /^[A-Za-z0-9_.-]+$/;
 
         if (!pattern.test(name)) {
             res.status(400).end();
@@ -209,7 +209,7 @@ export const updateUser = async (req: Request, res: Response) => {
         }
 
         const name = xss(req.body.name || req.session.user.name);
-        const pattern = /^[A-Za-z0-9]+$/;
+        const pattern = /^[A-Za-z0-9_.-]+$/;
         if (!pattern.test(name)) {
             res.status(400).end();
             return;
@@ -298,7 +298,7 @@ export const oauthSession = async (req: Request, res: Response) => {
         });
 
         if (!dbUser) {
-            let baseName = name.replace(/[^A-Za-z0-9_]/g, "") || "ChessPlayer";
+            let baseName = name.replace(/[^A-Za-z0-9_.-]/g, "") || "ChessPlayer";
             let uniqueName = baseName;
             let counter = 1;
 

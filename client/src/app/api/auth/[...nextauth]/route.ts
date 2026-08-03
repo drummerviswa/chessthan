@@ -57,15 +57,29 @@ const handler = NextAuth({
     maxAge: 30 * 24 * 60 * 60 // 30 days
   },
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       if (account?.provider === "google" || account?.provider === "github") {
         try {
           const apiUrl = getApiUrl();
+
+          // Derive a clean, space-free username from the OAuth provider
+          let preferredUsername: string;
+          if (account.provider === "github") {
+            // GitHub profile.login is the exact GitHub username (never has spaces)
+            preferredUsername = (profile as any)?.login || "";
+          } else {
+            // Google: use the part of the email before @ (e.g. john.doe@gmail.com → john.doe)
+            preferredUsername = (user.email || "").split("@")[0];
+          }
+
+          // Sanitize: keep only alphanumeric, dot, hyphen, underscore
+          preferredUsername = preferredUsername.replace(/[^A-Za-z0-9._-]/g, "");
+
           const res = await fetch(`${apiUrl}/v1/auth/oauth`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              name: user.name,
+              name: preferredUsername || user.name,
               email: user.email,
               avatarUrl: user.image
             })
@@ -95,6 +109,7 @@ const handler = NextAuth({
       }
       return true;
     },
+
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
