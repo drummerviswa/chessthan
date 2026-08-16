@@ -2,6 +2,7 @@ import "@/styles/globals.css";
 
 import type { ReactNode } from "react";
 
+import { Analytics } from "@vercel/analytics/next";
 import Sidebar from "@/components/Sidebar";
 import AuthModal from "@/components/auth/AuthModal";
 import UpgradeModal from "@/components/user/UpgradeModal";
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <AuthModal />
           <UpgradeModal />
         </ContextProvider>
+        <Analytics />
         <script
           id="load-theme"
           dangerouslySetInnerHTML={{
